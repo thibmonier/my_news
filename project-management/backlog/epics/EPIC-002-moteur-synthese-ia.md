@@ -29,10 +29,13 @@ Service de synthèse intelligente transformant articles et URL en condensés str
 | US-012 | Cache Redis 24h des synthèses générées | 3 | backlog | Must |
 | US-013 | Quota gratuit (3 synthèses/jour) et paywall progressif | 5 | backlog | Must |
 | US-014 | Fallback provider OpenAI en cas d'indisponibilité Mistral | 3 | backlog | Should |
-| US-015 | Synthèse on-device opt-in Flutter + Phi-3 Mini (P-003) | 8 | backlog | Should |
-| US-016 | Clustering sémantique et classification par sujets | 8 | backlog | Must |
+| US-015a | Téléchargement du modèle Phi-3 Mini on-device (Flutter) | 3 | backlog | Should |
+| US-015b | Inférence locale Phi-3 Mini pour synthèse concise (Flutter on-device) | 5 | backlog | Should |
+| US-016a | Génération d'embeddings sémantiques pour les articles ingérés | 3 | backlog | Must |
+| US-016b | Clustering HDBSCAN des articles par similarité sémantique | 3 | backlog | Must |
+| US-016c | Classification automatique des clusters par sujet (taxonomie) | 2 | backlog | Must |
 
-**Total EPIC : 37 story points**
+**Total EPIC : 37 story points | 10 US**
 **Sprint 1 (Walking Skeleton) : 5 pts | Backlog : 32 pts**
 
 ## Graphe de dépendances Mermaid
@@ -50,8 +53,11 @@ graph TD
     US012["US-012\nCache Redis 24h"]
     US013["US-013\nQuota 3/jour\n+ Paywall"]
     US014["US-014\nFallback OpenAI"]
-    US015["US-015\nOn-device Phi-3 Mini\n(Flutter opt-in)"]
-    US016["US-016\nClustering sémantique\n+ Classification"]
+    US015a["US-015a\nTéléchargement\nPhi-3 Mini on-device"]
+    US015b["US-015b\nInférence locale\n(synthèse concise)"]
+    US016a["US-016a\nEmbeddings\nsémantiques"]
+    US016b["US-016b\nClustering\nHDBSCAN"]
+    US016c["US-016c\nClassification\npar sujet"]
 
     EPIC001 -->|"articles ingérés"| US010
     US010 --> US011
@@ -60,15 +66,18 @@ graph TD
     US011 --> US013
     US012 --> US011
     EPIC003 -->|"UserPlan Free/Premium"| US013
-    US010 --> US015
-    US011 --> US016
-    US016 -->|"histoires regroupées"| EPIC004
+    US010 --> US015a
+    US015a --> US015b
+    EPIC001 -->|"articles ingérés"| US016a
+    US016a --> US016b
+    US016b --> US016c
+    US016c -->|"histoires regroupées"| EPIC004
 
     classDef sprint1 fill:#10B981,color:#fff,stroke:#059669
     classDef backlog fill:#6B7280,color:#fff,stroke:#4B5563
     classDef external fill:#F59E0B,color:#fff,stroke:#D97706
     class US010 sprint1
-    class US011,US012,US013,US014,US015,US016 backlog
+    class US011,US012,US013,US014,US015a,US015b,US016a,US016b,US016c backlog
     class EPIC001,EPIC003,EPIC004 external
 ```
 

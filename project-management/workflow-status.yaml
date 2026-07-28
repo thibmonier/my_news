@@ -2,7 +2,28 @@
 project: briefly-ai
 track: enterprise
 initialized_at: 2026-07-28T00:00:00Z
-current_phase: sprint-0-infra
+current_phase: sprint-1-ready
+
+backlog_frozen:
+  personas: "P-004 Sophie (Admin) ajouté — corrige US-021 INVEST V"
+  splits: "US-015→015a/b, US-016→016a/b/c, US-034→034a/b (parents SPLIT)"
+  totals: "56 US / 234 pts (points inchangés)"
+sprint_1_decomposed:
+  tasks: 84
+  hours: 140.5
+  capacity: "~132h (2 devs/10j) — dépassement +6% ; US-003 buffer retirable"
+  files: "sprints/sprint-001-walking_skeleton/tasks/ (7 US) + README + task-board"
+
+sprint_0:
+  status: done
+  commit: d03677c
+  remote: "github.com/thibmonier/my_news (privé)"
+  stack_resolved: "Symfony 8.1 (bump doctrine-bundle ^3.3, migrations ^4.0, api-platform ^4.3, php-cs-fixer ^3.95, maker ^1.67)"
+  gates: "PHPStan max 0 err · Deptrac 0 violation · Pest 8 tests · php-cs-fixer clean · composer.lock 0 vuln"
+  followups:
+    - "Feature test /api/health : à exécuter en CI (stack pg+redis via docker compose)"
+    - "qossmic/deptrac abandonné -> migrer vers deptrac/deptrac"
+    - "supprimer repo vide github.com/thibmonier/briefly-ai (scope delete_repo manquant)"
 
 context:
   type: greenfield

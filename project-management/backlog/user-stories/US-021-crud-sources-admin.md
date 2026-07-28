@@ -6,7 +6,7 @@
 |-------|--------|
 | **ID** | US-021 |
 | **EPIC parent** | EPIC-003 Gestion des Sources & Indexation |
-| **Persona** | Administrateur de la plateforme (bénéficiaire indirect : P-002 Priya — chercheuse en stratégie, 31 ans) |
+| **Persona** | P-004 Sophie — Administratrice de la plateforme (bénéficiaire indirect : P-002 Priya — chercheuse en stratégie, 31 ans) |
 | **Story Points** | 5 (Fibonacci) |
 | **Priorité** | Must Have (MoSCoW) |
 | **Sprint** | backlog |
@@ -15,7 +15,7 @@
 
 ### Carte
 
-**En tant qu'** administrateur de la plateforme Briefly AI (ROLE_ADMIN),
+**En tant que** P-004 Sophie, administratrice de la plateforme Briefly AI (ROLE_ADMIN),
 **Je veux** ajouter, modifier, supprimer et rechercher des sources RSS/Atom depuis l'interface d'administration, avec validation automatique du flux avant activation
 **Afin de** permettre à des utilisateurs comme P-002 Priya de bénéficier de sources premium pertinentes (The Economist, HBR, MIT Tech Review) correctement validées avant ingestion.
 
@@ -34,7 +34,7 @@
 
 - [x] **I**ndependent : dépend du schéma Source créé en US-020 mais peut être développée en parallèle (migration partagée)
 - [x] **N**egotiable : champs affichés dans la liste, filtres de recherche, workflow de validation
-- [x] **V**aluable : donne à l'administrateur le contrôle complet des sources ingérées, permettant de couvrir les besoins de Priya (sources premium) ; sans CRUD admin fonctionnel, le pipeline reste limité aux fixtures initiales
+- [x] **V**aluable : donne à P-004 Sophie le contrôle complet des sources ingérées sans dépendance technique, permettant de couvrir les besoins de P-002 Priya (sources premium) ; sans CRUD admin fonctionnel, le pipeline reste limité aux fixtures initiales
 - [x] **E**stimable : CRUD Symfony Form + Twig/Turbo + Messenger (workflow validation), estimé 5 pts
 - [x] **S**ized : 5 pts < 8 pts
 - [x] **T**estable : tests PHPUnit pour les use cases CRUD, Panther pour les formulaires Twig

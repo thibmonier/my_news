@@ -28,11 +28,12 @@ Fournir aux utilisateurs de Briefly AI un espace personnel sécurisé couvrant l
 | US-031 | Authentification déléguée Google / GitHub (OAuth2) | 5 | backlog |
 | US-032 | Gestion du profil utilisateur | 3 | backlog |
 | US-033 | Quota quotidien de synthèses et paywall placeholder | 5 | sprint-001 |
-| US-034 | Abonnement Briefly Premium via Stripe Billing | 8 | backlog |
+| US-034a | Stripe Checkout et activation de l'abonnement Premium | 5 | backlog |
+| US-034b | Customer Portal Stripe et gestion du cycle de vie (downgrade/annulation) | 3 | backlog |
 | US-035 | Réglages de confidentialité et préférences RGPD | 3 | backlog |
 | US-036 | Suppression de compte conforme RGPD | 3 | backlog |
 
-**Total : 32 points | Sprint-001 : 10 points | Backlog : 22 points**
+**Total : 32 points | 8 US | Sprint-001 : 10 points | Backlog : 22 points**
 
 ## Graphe de dépendances Mermaid
 
@@ -43,7 +44,8 @@ graph LR
         US031["US-031\nOAuth Google/GitHub\n5 pts – Backlog"]
         US032["US-032\nProfil utilisateur\n3 pts – Backlog"]
         US033["US-033\nQuota + Paywall placeholder\n5 pts – Sprint-001"]
-        US034["US-034\nAbonnement Premium Stripe\n8 pts – Backlog"]
+        US034a["US-034a\nStripe Checkout\n+ webhook created\n5 pts – Backlog"]
+        US034b["US-034b\nCustomer Portal\n+ webhook cancel\n3 pts – Backlog"]
         US035["US-035\nRéglages confidentialité\n3 pts – Backlog"]
         US036["US-036\nSuppression compte RGPD\n3 pts – Backlog"]
     end
@@ -53,7 +55,8 @@ graph LR
     US030 --> US033
     US030 --> US035
     US030 --> US036
-    US033 --> US034
+    US033 --> US034a
+    US034a --> US034b
 
     EPIC001["EPIC-001\nAgrégation de flux"] -.->|fournit les articles synthétisés| US033
     EPIC002["EPIC-002\nMoteur Synthèse IA"] -.->|décompte par synthèse générée| US033

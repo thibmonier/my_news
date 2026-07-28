@@ -9,7 +9,7 @@
 | Type | En Sprint | Backlog | Done | Total |
 |------|-----------|---------|------|-------|
 | EPICs | 4 | 4 | 0 | 8 |
-| User Stories | 7 | 45 | 0 | 52 |
+| User Stories | 7 | 49 | 0 | 56 |
 | Story Points | 36 | 198 | 0 | 234 |
 
 **Velocite cible** : 20–40 pts/sprint | **Sprint actuel** : sprint-001-walking_skeleton
@@ -21,14 +21,14 @@
 | ID | Nom | Priorite (MoSCoW) | US | Points | Statut |
 |----|-----|-------------------|----|--------|--------|
 | EPIC-001 | Daily Brief Core | Must Have | 7 | 28 | En Sprint (3 US) |
-| EPIC-002 | Moteur de Synthese IA | Must Have | 7 | 37 | En Sprint (1 US) |
+| EPIC-002 | Moteur de Synthese IA | Must Have | 10 | 37 | En Sprint (1 US) |
 | EPIC-003 | Gestion des Sources & Indexation | Must Have | 6 | 29 | En Sprint (1 US) |
-| EPIC-004 | Comptes Utilisateurs & Premium | Must Have | 7 | 32 | En Sprint (2 US) |
+| EPIC-004 | Comptes Utilisateurs & Premium | Must Have | 8 | 32 | En Sprint (2 US) |
 | EPIC-005 | Experience Mobile Native | Should Have | 6 | 25 | Backlog |
 | EPIC-006 | API Publique | Could Have | 6 | 23 | Backlog |
 | EPIC-007 | Privacy & On-Device AI | Should Have | 6 | 27 | Backlog |
 | EPIC-008 | Analytics & Personnalisation | Could Have | 7 | 33 | Backlog |
-| | **TOTAL** | | **52** | **234** | |
+| | **TOTAL** | | **56** | **234** | |
 
 ---
 
@@ -68,7 +68,7 @@
 | US-006 | Featured Summary desktop + CTA Lire le brief complet | 5 | 🔲 Backlog |
 | US-007 | Indicateur de progression de lecture (ligne emeraude 2px) | 2 | 🔲 Backlog |
 
-### EPIC-002 — Moteur de Synthese IA (37 pts / 7 US)
+### EPIC-002 — Moteur de Synthese IA (37 pts / 10 US)
 
 > MMF : En un clic depuis n'importe quel article ou URL, Briefly genere un condense structure (~200 mots) prefixe "BRIEFLY AI:" avec 3 points cles et sources citees.
 
@@ -79,8 +79,11 @@
 | US-012 | Cache Redis 24h des syntheses generees | 3 | 🔲 Backlog |
 | US-013 | Quota gratuit (3 syntheses/jour) et paywall progressif | 5 | 🔲 Backlog |
 | US-014 | Fallback provider OpenAI en cas d'indisponibilite Mistral | 3 | 🔲 Backlog |
-| US-015 | Synthese on-device opt-in Flutter + Phi-3 Mini (P-003) | 8 | 🔲 Backlog |
-| US-016 | Clustering semantique et classification par sujets | 8 | 🔲 Backlog |
+| US-015a | Telechargement du modele Phi-3 Mini on-device (Flutter) | 3 | 🔲 Backlog |
+| US-015b | Inference locale Phi-3 Mini pour synthese concise (Flutter on-device) | 5 | 🔲 Backlog |
+| US-016a | Generation d'embeddings semantiques pour les articles ingeres | 3 | 🔲 Backlog |
+| US-016b | Clustering HDBSCAN des articles par similarite semantique | 3 | 🔲 Backlog |
+| US-016c | Classification automatique des clusters par sujet (taxonomie) | 2 | 🔲 Backlog |
 
 ### EPIC-003 — Gestion des Sources & Indexation (29 pts / 6 US)
 
@@ -95,7 +98,7 @@
 | US-024 | File de priorite Messenger (premium avant gratuit) | 3 | 🔲 Backlog |
 | US-025 | Connecteur Google News (sous-canaux A la une / Technologie / Science) | 5 | 🔲 Backlog |
 
-### EPIC-004 — Comptes Utilisateurs & Premium (32 pts / 7 US)
+### EPIC-004 — Comptes Utilisateurs & Premium (32 pts / 8 US)
 
 > MMF : Un visiteur peut creer un compte en moins de 2 minutes, consulter son quota de syntheses restant et etre invite a passer Briefly Premium des le depassement de la limite quotidienne gratuite.
 
@@ -105,7 +108,8 @@
 | US-033 | Quota quotidien de syntheses et paywall placeholder | 5 | 🔲 En Sprint |
 | US-031 | Authentification deleguee Google / GitHub (OAuth2) | 5 | 🔲 Backlog |
 | US-032 | Gestion du profil utilisateur | 3 | 🔲 Backlog |
-| US-034 | Abonnement Briefly Premium via Stripe Billing | 8 | 🔲 Backlog |
+| US-034a | Stripe Checkout et activation de l'abonnement Premium | 5 | 🔲 Backlog |
+| US-034b | Customer Portal Stripe et gestion du cycle de vie (downgrade/annulation) | 3 | 🔲 Backlog |
 | US-035 | Reglages de confidentialite et preferences RGPD | 3 | 🔲 Backlog |
 | US-036 | Suppression de compte conforme RGPD | 3 | 🔲 Backlog |
 
@@ -161,6 +165,23 @@
 | US-074 | Partage d'article et acces a la source originale | 3 | 🔲 Backlog |
 | US-075 | Tableau de bord analytique respectueux RGPD | 5 | 🔲 Backlog |
 | US-076 | Metriques produit — retention et engagement | 5 | 🔲 Backlog |
+
+---
+
+## Dependances de sequencement acceptees (INVEST I documente)
+
+Les dependances listees ci-dessous sont des contraintes de sequencement technique inherentes au domaine (une US consomme la donnee produite par une autre). Elles sont documentees ici pour la transparence de la planification sprint. Elles ne constituent pas des defauts INVEST — chaque US reste independante au sens INVEST (testable isolement via stubs/fixtures, negociable dans ses details).
+
+| US | Depend de | Nature de la dependance |
+|----|-----------|------------------------|
+| US-011 | US-010 | US-011 etend l'interface `SynthesisService` definie par le Walking Skeleton US-010 ; testable avec stub du service |
+| US-015b | US-015a | L'inference on-device requiert le modele Phi-3 Mini telecharge par US-015a ; testable avec fixture modele local |
+| US-016b | US-016a | Le clustering HDBSCAN lit les embeddings generes par US-016a ; testable avec embeddings en fixture pgvector |
+| US-016c | US-016b | La classification par topic consomme les clusters crees par US-016b ; testable avec clusters en fixture |
+| US-034b | US-034a | Le Customer Portal Stripe necessite un abonnement actif et l'infrastructure webhook US-034a ; testable avec subscription en fixture |
+| US-051 | US-050 | L'endpoint GET /v1/daily-brief necessite un token API valide (US-050) pour l'authentification |
+| US-052 | US-050 | L'endpoint POST /v1/synthesize necessite un token API valide (US-050) pour l'authentification |
+| US-054 | US-051 + US-052 | La documentation OpenAPI documente les endpoints US-051 et US-052 qui doivent exister |
 
 ---
 

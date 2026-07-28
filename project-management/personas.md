@@ -11,7 +11,8 @@
 1. [P-001 — Thomas, Cadre dirigeant tech](#p-001--thomas-cadre-dirigeant-tech)
 2. [P-002 — Priya, Chercheuse en stratégie](#p-002--priya-chercheuse-en-stratégie)
 3. [P-003 — Marc, Développeur indépendant privacy-first](#p-003--marc-développeur-indépendant-privacy-first)
-4. [Synthèse comparative](#synthèse-comparative)
+4. [P-004 — Sophie, Administratrice de la plateforme](#p-004--sophie-administratrice-de-la-plateforme)
+5. [Synthèse comparative](#synthèse-comparative)
 
 ---
 
@@ -181,18 +182,71 @@ Métrique proxy: Marc appelle l'API ≥ 20 fois en 30 jours (engagement API acti
 
 ---
 
+## P-004 — Sophie, Administratrice de la plateforme
+
+### Identité
+
+| Attribut | Valeur |
+|----------|--------|
+| Prénom | Sophie |
+| Âge | 35 ans |
+| Rôle | Content Operations Manager — Administratrice de la plateforme Briefly AI (ROLE_ADMIN) |
+| Localisation | Paris (siège Briefly AI) |
+| Niveau tech | Intermédiaire (à l'aise avec les interfaces d'administration web, pas développeuse) |
+| Dispositifs | MacBook Pro (interface d'admin web), Slack (alertes pipeline), Datadog (monitoring) |
+| Langue préférée | Français |
+
+### Citation
+
+> "Un pipeline qui échoue en silence, c'est pire qu'un pipeline qui crie. Je veux voir immédiatement ce qui ne va pas — et pouvoir le corriger moi-même, sans ouvrir un ticket tech."
+
+### Objectifs liés à Briefly AI
+
+1. **Maintenir un catalogue de sources RSS/Atom pertinent et à jour** : ajouter des nouvelles sources premium (The Economist, MIT Tech Review, Les Echos), éditer les URL en cas de changement, désactiver les sources défaillantes.
+2. **Valider la santé de chaque flux avant activation** : s'assurer qu'une source est accessible, que son Content-Type est correct (`application/rss+xml`, `text/xml`) et qu'elle retourne des articles valides avant de l'activer dans le pipeline d'ingestion.
+3. **Monitorer en temps réel le taux d'erreur d'ingestion par source** : identifier immédiatement les sources défaillantes (404, timeout, changement d'URL) grâce à des indicateurs visuels sans avoir à consulter les logs serveur.
+4. **Résoudre les incidents pipeline sans intervention de l'équipe technique** : modifier une URL de source, re-déclencher une validation, désactiver temporairement une source qui rate 100% de ses tentatives.
+
+### Frustrations actuelles
+
+| Frustration | Contexte |
+|-------------|----------|
+| **Aucune visibilité en temps réel** | Elle ne sait pas qu'une source échoue jusqu'à ce qu'un utilisateur signale l'absence d'articles (Priya envoie un message Slack : "je ne vois plus les articles de HBR depuis 3 jours"). |
+| **Dépendance à l'équipe technique** | Chaque ajout ou modification de source nécessite un ticket dev et un déploiement. Délai moyen : 2 à 5 jours ouvrés. |
+| **Pas d'historique d'erreur par source** | Elle ne peut pas distinguer un incident ponctuel (coupure CDN de 1h) d'une défaillance structurelle (URL de flux changée définitivement). Elle agit toujours dans l'urgence. |
+| **Impossible de tester avant d'activer** | Elle ne peut pas vérifier qu'un flux est valide avant de l'intégrer au pipeline — risque de pollution avec des doublons ou des articles malformés. |
+| **Alertes inexistantes ou trop verbeuses** | Les logs Datadog lui envoient des alertes pour chaque erreur HTTP individuelle, sans agrégation par source. Elle reçoit 200 alertes pour une seule source tombée. |
+
+### Scénario d'utilisation clé
+
+**Contexte:** Sophie reçoit un message Slack de Priya le lundi matin : "Je ne vois plus aucun article de The Economist depuis vendredi. C'est un problème de source ?"
+
+**Besoin:** Identifier et corriger rapidement une source défaillante sans bloquer l'ingestion des autres sources.
+
+**Action:** Elle ouvre `/admin/sources`, recherche "Economist". Elle voit immédiatement le badge rouge "Échec de validation" à côté de The Economist avec le détail : "HTTP 404 — URL introuvable depuis 48h". Elle clique "Modifier", remplace l'URL par la nouvelle URL du flux RSS (trouvée sur le site de The Economist), clique "Enregistrer". Le système relance une validation asynchrone. En moins de 30 secondes, le badge passe à "En validation", puis à "Actif". Elle répond à Priya sur Slack : "Corrigé, les articles The Economist seront de retour au prochain cycle (dans moins d'1h)."
+
+**Résultat:** L'incident est résolu en 3 minutes, sans ticket technique, sans déploiement. Sophie a agi de façon autonome et informé l'utilisatrice affectée dans la foulée.
+
+### Critère de succès Briefly AI
+
+Sophie juge Briefly AI réussi si, après 30 jours d'utilisation de l'interface d'administration, elle peut dire : **"Je gère l'intégralité du catalogue de sources et je réponds à 90% des incidents pipeline sans ouvrir un ticket tech."**
+
+Métrique proxy : temps moyen de résolution d'un incident source < 30 minutes ; taux de disponibilité des sources actives ≥ 95% mesuré sur 30 jours.
+
+---
+
 ## Synthèse comparative
 
-| Dimension | P-001 Thomas | P-002 Priya | P-003 Marc |
-|-----------|-------------|-------------|------------|
-| **Contexte d'usage principal** | Mobile, matin, trajet | Desktop, session de travail | Mobile on-device + API home server |
-| **Fréquence** | Quotidienne (5j/7) | 3-4 fois/semaine, intense le vendredi | Quotidienne mobile, hebdomadaire API |
-| **Feature prioritaire** | Daily Brief rapide + partage Slack | Synthèse détaillée + Export Markdown | On-device + API REST |
-| **Sensibilité au prix** | Faible (valeur temps > coût) | Moyenne (justifie vs coût abonnements multiples) | Nulle (paie pour contrôle et fiabilité) |
-| **Sensibilité à la privacy** | Faible | Moyenne (données professionnelles) | Maximale (principe de fonctionnement) |
-| **KPI de rétention clé** | DAU/WAU ≥ 71 % (5j/7) | Feature export ≥ 1/semaine | Appels API ≥ 5/semaine |
-| **Risque d'attrition** | Brief pas assez rapide / pertinent | Source manquante ou synthèse inexacte | Fuite de données avérée ou RGPD non tenu |
-| **Plan cible** | Premium (valeur immédiate) | Premium (export + sources) | Premium (API) |
+| Dimension | P-001 Thomas | P-002 Priya | P-003 Marc | P-004 Sophie |
+|-----------|-------------|-------------|------------|--------------|
+| **Contexte d'usage principal** | Mobile, matin, trajet | Desktop, session de travail | Mobile on-device + API home server | Interface admin web, bureau (ad hoc) |
+| **Fréquence** | Quotidienne (5j/7) | 3-4 fois/semaine, intense le vendredi | Quotidienne mobile, hebdomadaire API | Hebdomadaire (maintenance) + ponctuelle (incidents) |
+| **Feature prioritaire** | Daily Brief rapide + partage Slack | Synthèse détaillée + Export Markdown | On-device + API REST | CRUD sources + monitoring pipeline santé |
+| **Sensibilité au prix** | Faible (valeur temps > coût) | Moyenne (justifie vs coût abonnements multiples) | Nulle (paie pour contrôle et fiabilité) | N/A (accès ROLE_ADMIN hors abonnement) |
+| **Sensibilité à la privacy** | Faible | Moyenne (données professionnelles) | Maximale (principe de fonctionnement) | Moyenne (accès config, pas données utilisateurs) |
+| **KPI de rétention clé** | DAU/WAU ≥ 71 % (5j/7) | Feature export ≥ 1/semaine | Appels API ≥ 5/semaine | Disponibilité sources ≥ 95% / incident résolu < 30 min |
+| **Risque d'attrition** | Brief pas assez rapide / pertinent | Source manquante ou synthèse inexacte | Fuite de données avérée ou RGPD non tenu | Dépendance tech persiste / interface trop complexe |
+| **Plan cible** | Premium (valeur immédiate) | Premium (export + sources) | Premium (API) | ROLE_ADMIN (hors plan commercial) |
 
 ### Tensions à résoudre en conception
 
