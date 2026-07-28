@@ -1,17 +1,31 @@
 ## Briefly AI — Sécurité Symfony
-## Argon2id via sodium (constitution §6, jamais bcrypt/MD5/SHA1)
-## Deny by default : voters explicites sur chaque opération API Platform (ADR-007 §7)
+## Constitution §6 : Argon2id (sodium), deny by default, voters, UUID non séquentiels
+## ADR-005 : OAuth2 (Google/GitHub) + JWT mobile + session desktop
+## ADR-007 §7 : voters explicites sur chaque opération API Platform
 
 security:
-    # Hachage mots de passe : Argon2id 128 MiB / t=3 / p=1 via libsodium (constitution §6)
+    # Hachage mots de passe : sodium = Argon2id via libsodium (constitution §6)
+    # Jamais MD5/SHA1/bcrypt en nouveau code.
     password_hashers:
         Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
             algorithm: sodium
 
-    # Providers (Sprint 0 : placeholder — User entity en Sprint 2)
+    # Providers
     providers:
+        # Sprint 1 : admin en mémoire pour l'UI /admin (Walking Skeleton — ADR-005).
+        # Sprint 2 : remplacé par OAuth2 (Google/GitHub) + JWT mobile.
         users_in_memory:
-            memory: ~
+            memory:
+                users:
+                    admin:
+                        password: '$argon2id$v=19$m=65536,t=4,p=1$bWVtb3J5dGVzdA$dummyhashforsprintoneonlyreplaceinsprint2'
+                        roles: ['ROLE_ADMIN']
+
+        # US-030 : Utilisateurs inscrits par email — provider Doctrine.
+        app_users:
+            entity:
+                class: App\Infrastructure\User\Persistence\DoctrineUserEntity
+                property: email
 
     firewalls:
         # Exclure profiler/debugger en dev
@@ -19,18 +33,46 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
 
-        # Firewall principal — Sprint 0 (placeholder)
-        # Sprint 2 : JWT authenticator (mobile) + session authenticator (desktop)
+        # Firewall admin — HTTP Basic pour /admin (Sprint 1 uniquement, remplacé Sprint 2)
+        admin:
+            pattern: ^/admin
+            provider: users_in_memory
+            http_basic:
+                realm: 'Briefly AI Admin'
+            stateless: true
+
+        # Firewall principal — form_login pour le desktop (ADR-001, ADR-005)
+        # Session HttpOnly + SameSite=Strict (framework.yaml)
         main:
             lazy: true
-            provider: users_in_memory
-            stateless: false
+            provider: app_users
+            form_login:
+                login_path: /login
+                check_path: /login
+                default_target_path: /dashboard
+                username_parameter: email
+                password_parameter: password
+                enable_csrf: true
+            logout:
+                path: /logout
+                target: /
 
-    # Deny by default : contrôle explicite via voters (ADR-007 §7, constitution §6)
-    access_control: []
+    # Deny by default (constitution §6) — accès explicites uniquement
+    access_control:
+        # US-001 : routes publiques (IS_AUTHENTICATED_ANONYMOUSLY)
+        - { path: ^/brief, roles: PUBLIC_ACCESS }
+        - { path: ^/$, roles: PUBLIC_ACCESS }
+        # Routes authentifiées
+        - { path: ^/admin, roles: ROLE_ADMIN }
+        - { path: ^/dashboard, roles: ROLE_USER }
+        - { path: ^/api/v1/quota, roles: ROLE_USER }          # US-033 : quota endpoint authentifié
+        - { path: ^/quota/paywall-modal, roles: ROLE_USER }  # US-033 : paywall modal authentifié
+        - { path: ^/api/v1, roles: PUBLIC_ACCESS }           # API Platform — voters sur chaque opération
 
 when@test:
     security:
         password_hashers:
             Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: plaintext
+            App\Infrastructure\User\Persistence\DoctrineUserEntity:
                 algorithm: plaintext

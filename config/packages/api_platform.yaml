@@ -9,9 +9,6 @@ api_platform:
         Synthèses : Mistral (UE, RGPD) | EdDSA JWT mobile | Sessions HttpOnly desktop.
     version: '1.0.0'
 
-    # Chemin de base : /api/v1/... (ADR-007 §2)
-    path_prefix: /api/v1
-
     # Formats supportés
     formats:
         jsonld: ['application/ld+json']
@@ -21,6 +18,10 @@ api_platform:
         jsonopenapi: ['application/vnd.openapi+json']
         jsonld: ['application/ld+json']
         html: ['text/html']
+
+    # Désactiver l'intégration Doctrine ORM (pas d'ApiResource avec ORM dans ce projet — State Providers/Processors hexagonaux)
+    doctrine:
+        enabled: false
 
     # Defaults globaux pour toutes les ApiResource
     defaults:
@@ -35,10 +36,8 @@ api_platform:
     collection:
         pagination:
             page_parameter_name: page
-            items_per_page: 25
-            maximum_items_per_page: 100
-            client_items_per_page: true
-            client_enabled: true
+            items_per_page_parameter_name: itemsPerPage
+            enabled_parameter_name: pagination
 
     # OpenAPI enrichie (CI exporte docs/openapi.json)
     openapi:

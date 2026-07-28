@@ -1,0 +1,100 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Brief\Persistence;
+
+use App\Domain\Brief\BriefPublicView;
+use App\Domain\Brief\BriefPublicViewRepositoryInterface;
+use App\Domain\Brief\BriefStoryPublicView;
+use Doctrine\DBAL\Connection;
+
+/**
+ * Adapter DBAL — Implémentation de BriefPublicViewRepositoryInterface (US-001).
+ *
+ * Requête unique avec JOIN pour éviter les N+1 queries :
+ * daily_briefs → brief_stories → articles → sources.
+ *
+ * Performances :
+ * - Sous-requête pour sélectionner l'id du brief le plus récent (index date DESC)
+ * - Limitation à 3 stories (invariant INV-1)
+ * - Troncature excerpt à 280 chars côté SQL (LEFT() PostgreSQL)
+ *
+ * SÉCURITÉ :
+ * - Requêtes paramétrées uniquement (prévention injection SQL — OWASP #3)
+ * - Aucune donnée personnelle dans cette requête (articles = données éditoriales)
+ *
+ * Couche Infrastructure : dépend de DBAL et du Domain.
+ * Deptrac : Infrastructure:[Domain, Application].
+ */
+final class DoctrineBriefPublicViewRepository implements BriefPublicViewRepositoryInterface
+{
+    private const EXCERPT_MAX_LENGTH = 280;
+
+    public function __construct(
+        private readonly Connection $connection,
+    ) {
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Requête SQL :
+     * 1. Sous-requête : id du brief le plus récent avec status = 'ready'
+     * 2. JOIN brief_stories → articles → sources sur ce brief
+     * 3. Troncature excerpt à 280 chars (LEFT())
+     * 4. Tri par position ASC
+     */
+    public function findLatestPublicView(): ?BriefPublicView
+    {
+        /** @var list<array{updated_at: string, position: string, article_title: string, article_url: string, excerpt: string, source_name: string}> $rows */
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+                SELECT
+                    db.updated_at,
+                    bs.position,
+                    a.title          AS article_title,
+                    a.url            AS article_url,
+                    LEFT(a.raw_content, :excerpt_length) AS excerpt,
+                    s.name           AS source_name
+                FROM daily_briefs db
+                JOIN brief_stories bs ON bs.brief_id = db.id
+                JOIN articles a       ON CAST(a.id AS TEXT) = CAST(bs.article_id AS TEXT)
+                JOIN sources s        ON CAST(s.id AS TEXT) = CAST(a.source_id AS TEXT)
+                WHERE db.id = (
+                    SELECT id
+                    FROM daily_briefs
+                    WHERE status = 'ready'
+                    ORDER BY date DESC
+                    LIMIT 1
+                )
+                ORDER BY bs.position ASC
+                LIMIT 3
+                SQL,
+            ['excerpt_length' => self::EXCERPT_MAX_LENGTH],
+        );
+
+        if ([] === $rows) {
+            return null;
+        }
+
+        $firstRow = $rows[0];
+        $updatedAt = new \DateTimeImmutable($firstRow['updated_at'], new \DateTimeZone('UTC'));
+
+        $stories = array_map(
+            static fn (array $row): BriefStoryPublicView => new BriefStoryPublicView(
+                position: (int) $row['position'],
+                articleTitle: $row['article_title'],
+                articleUrl: $row['article_url'],
+                excerpt: $row['excerpt'],
+                sourceName: $row['source_name'],
+            ),
+            $rows,
+        );
+
+        return new BriefPublicView(
+            updatedAt: $updatedAt,
+            stories: $stories,
+        );
+    }
+}

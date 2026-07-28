@@ -141,7 +141,7 @@ Objectif pour Sprint 2 :
 - [ ] PHPStan niveau max : 0 erreur
 - [ ] Architecture hexagonale : pas de fuite d'infrastructure dans le domaine
 - [ ] Pas de code mort, pas de TODO non tickete
-- [ ] UUID v7 non sequentiels sur toutes les nouvelles entites
+- [ ] UUID v4 non sequentiels sur toutes les nouvelles entites (cf ADR-006)
 
 ### Tests
 - [ ] Couverture de code >= 80% (unitaires + integration)

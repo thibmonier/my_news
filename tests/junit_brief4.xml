@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="5" assertions="18" errors="0" failures="5" skipped="0" time="0.041303">
+    <testsuite name="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php" tests="5" assertions="18" errors="0" failures="5" skipped="0" time="0.041303">
+      <testcase name="brief.batch_success contient duration_ms (entier) et la date cible" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::brief.batch_success contient duration_ms (entier) et la date cible" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="3" time="0.036298">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">brief.batch_success contient duration_ms (entier) et la date cibleFailed asserting that 0 matches expected 'duration_ms requis dans brief.batch_success'.
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:219</failure>
+      </testcase>
+      <testcase name="Nominal : lock acquis → selectTopStories() exécuté → lock libéré → log brief.batch_success" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Nominal : lock acquis → selectTopStories() exécuté → lock libéré → log brief.batch_success" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="4" time="0.001958">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Nominal : lock acquis → selectTopStories() exécuté → lock libéré → log brief.batch_successFailed asserting that an array contains 'log brief.batch_start requis'.
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:66</failure>
+      </testcase>
+      <testcase name="Lock déjà acquis : TryLock=false → log brief.lock_already_acquired → service NON appelé" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Lock déjà acquis : TryLock=false → log brief.lock_already_acquired → service NON appelé" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="3" time="0.000627">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Lock déjà acquis : TryLock=false → log brief.lock_already_acquired → service NON appeléFailed asserting that an array contains 'log brief.lock_already_acquired requis'.
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:100</failure>
+      </testcase>
+      <testcase name="Redis KO : LockStorageException → log brief.lock_unavailable → service exécuté (résilience)" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Redis KO : LockStorageException → log brief.lock_unavailable → service exécuté (résilience)" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="3" time="0.001671">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Redis KO : LockStorageException → log brief.lock_unavailable → service exécuté (résilience)Failed asserting that an array contains 'log WARNING brief.lock_unavailable requis'.
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:146</failure>
+      </testcase>
+      <testcase name="Erreur technique : exception propagée pour retry Messenger + lock libéré dans finally" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Erreur technique : exception propagée pour retry Messenger + lock libéré dans finally" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="5" time="0.000750">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Erreur technique : exception propagée pour retry Messenger + lock libéré dans finallyFailed asserting that an array contains 'log ERROR brief.batch_failed requis avant re-throw'.
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:184</failure>
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

@@ -34,6 +34,62 @@ services:
     ports:
       - "6379:6379"
 
+  # ── Worker Messenger async (US-002 + US-003) ─────────────────────────────
+  # Consomme les messages GenerateDailyBriefMessage et FetchSourceMessage.
+  # --time-limit=3600 : redémarrage propre après 1h (FrankenPHP restart automatique).
+  messenger-worker:
+    build:
+      context: .
+      target: dev
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "-vv"]
+    environment:
+      APP_ENV: dev
+      APP_SECRET: "${APP_SECRET:-changeme_dev_only}"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://briefly:briefly@database:5432/briefly?serverVersion=16&charset=utf8}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
+      MESSENGER_TRANSPORT_DSN: "${MESSENGER_TRANSPORT_DSN:-redis://redis:6379/messages}"
+      LOCK_DSN: "${LOCK_DSN:-redis://redis:6379}"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app:cached
+      - app_vendor:/app/vendor
+      - app_var:/app/var
+    networks:
+      - briefly_net
+    restart: unless-stopped
+
+  # ── Worker Scheduler brief (US-003) ──────────────────────────────────────
+  # Consomme le transport scheduler_brief → déclenche GenerateDailyBriefMessage à 05:00 UTC.
+  # BriefScheduleProvider (#[AsSchedule('brief')]) enregistre le cron 0 5 * * *.
+  scheduler-brief-worker:
+    build:
+      context: .
+      target: dev
+    command: ["php", "bin/console", "messenger:consume", "scheduler_brief", "--time-limit=3600", "-vv"]
+    environment:
+      APP_ENV: dev
+      APP_SECRET: "${APP_SECRET:-changeme_dev_only}"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://briefly:briefly@database:5432/briefly?serverVersion=16&charset=utf8}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
+      MESSENGER_TRANSPORT_DSN: "${MESSENGER_TRANSPORT_DSN:-redis://redis:6379/messages}"
+      LOCK_DSN: "${LOCK_DSN:-redis://redis:6379}"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app:cached
+      - app_vendor:/app/vendor
+      - app_var:/app/var
+    networks:
+      - briefly_net
+    restart: unless-stopped
+
 volumes:
   app_vendor:
   app_var:

@@ -14,10 +14,9 @@ doctrine:
         profiling_collect_backtrace: '%kernel.debug%'
 
     orm:
-        auto_generate_proxy_classes: true
-        enable_lazy_ghost_objects: true
+        # auto_generate_proxy_classes et enable_lazy_ghost_objects supprimés (ORM 3.x — gérés automatiquement)
+        # report_fields_where_declared supprimé (ORM 3.x — option retirée)
         naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
-        report_fields_where_declared: true
         validate_xml_mapping: true
 
         # Mapping : attributs PHP 8 dans src/Infrastructure/ uniquement

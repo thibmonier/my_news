@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="5" assertions="0" errors="5" failures="0" skipped="0" time="0.012231">
+    <testsuite name="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php" tests="5" assertions="0" errors="5" failures="0" skipped="0" time="0.012231">
+      <testcase name="Erreur technique : exception propagée pour retry Messenger + lock libéré dans finally" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Erreur technique : exception propagée pour retry Messenger + lock libéré dans finally" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="0" time="0.011170">
+        <error type="PHPUnit\Framework\MockObject\Generator\ClassIsFinalException">Erreur technique : exception propagée pour retry Messenger + lock libéré dans finallyClass "App\Domain\Brief\BriefSelectorService" is declared "final" and cannot be doubled
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:162</error>
+      </testcase>
+      <testcase name="Lock déjà acquis : TryLock=false → log brief.lock_already_acquired → service NON appelé" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Lock déjà acquis : TryLock=false → log brief.lock_already_acquired → service NON appelé" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="0" time="0.000370">
+        <error type="PHPUnit\Framework\MockObject\Generator\ClassIsFinalException">Lock déjà acquis : TryLock=false → log brief.lock_already_acquired → service NON appeléClass "App\Domain\Brief\BriefSelectorService" is declared "final" and cannot be doubled
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:81</error>
+      </testcase>
+      <testcase name="brief.batch_success contient duration_ms (entier) et la date cible" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::brief.batch_success contient duration_ms (entier) et la date cible" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="0" time="0.000160">
+        <error type="PHPUnit\Framework\MockObject\Generator\ClassIsFinalException">brief.batch_success contient duration_ms (entier) et la date cibleClass "App\Domain\Brief\BriefSelectorService" is declared "final" and cannot be doubled
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:197</error>
+      </testcase>
+      <testcase name="Redis KO : LockStorageException → log brief.lock_unavailable → service exécuté (résilience)" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Redis KO : LockStorageException → log brief.lock_unavailable → service exécuté (résilience)" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="0" time="0.000347">
+        <error type="PHPUnit\Framework\MockObject\Generator\ClassIsFinalException">Redis KO : LockStorageException → log brief.lock_unavailable → service exécuté (résilience)Class "App\Domain\Brief\BriefSelectorService" is declared "final" and cannot be doubled
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:119</error>
+      </testcase>
+      <testcase name="Nominal : lock acquis → selectTopStories() exécuté → lock libéré → log brief.batch_success" file="tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php::Nominal : lock acquis → selectTopStories() exécuté → lock libéré → log brief.batch_success" class="Tests\Unit\Application\Brief\GenerateDailyBriefHandlerLockTest" classname="Tests.Unit.Application.Brief.GenerateDailyBriefHandlerLockTest" assertions="0" time="0.000184">
+        <error type="PHPUnit\Framework\MockObject\Generator\ClassIsFinalException">Nominal : lock acquis → selectTopStories() exécuté → lock libéré → log brief.batch_successClass "App\Domain\Brief\BriefSelectorService" is declared "final" and cannot be doubled
+at tests/Unit/Application/Brief/GenerateDailyBriefHandlerLockTest.php:42</error>
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

@@ -12,7 +12,7 @@ use App\Domain\Health\HealthReport;
  * Couvre : agrégation du statut, immutabilité, accès aux composants.
  */
 
-test('HealthReport retourne ok quand tous les composants sont sains', static function (): void {
+test('HealthReport retourne ok quand tous les composants sont sains', function (): void {
     $report = new HealthReport([
         new ComponentStatus('database', 'ok', 'Connected'),
         new ComponentStatus('redis', 'ok', 'Connected'),
@@ -22,7 +22,7 @@ test('HealthReport retourne ok quand tous les composants sont sains', static fun
         ->and($report->getStatus())->toBe('ok');
 });
 
-test('HealthReport retourne degraded si au moins un composant est dégradé', static function (): void {
+test('HealthReport retourne degraded si au moins un composant est dégradé', function (): void {
     $report = new HealthReport([
         new ComponentStatus('database', 'ok', 'Connected'),
         new ComponentStatus('redis', 'degraded', 'Connection refused'),
@@ -32,7 +32,7 @@ test('HealthReport retourne degraded si au moins un composant est dégradé', st
         ->and($report->getStatus())->toBe('degraded');
 });
 
-test('HealthReport est degraded si tous les composants sont dégradés', static function (): void {
+test('HealthReport est degraded si tous les composants sont dégradés', function (): void {
     $report = new HealthReport([
         new ComponentStatus('database', 'degraded', 'Timeout'),
         new ComponentStatus('redis', 'degraded', 'Timeout'),
@@ -42,14 +42,14 @@ test('HealthReport est degraded si tous les composants sont dégradés', static 
         ->and($report->getStatus())->toBe('degraded');
 });
 
-test('HealthReport est ok avec une liste vide de composants', static function (): void {
+test('HealthReport est ok avec une liste vide de composants', function (): void {
     $report = new HealthReport([]);
 
     expect($report->isHealthy())->toBeTrue()
         ->and($report->getStatus())->toBe('ok');
 });
 
-test('HealthReport expose les composants fournis à la construction', static function (): void {
+test('HealthReport expose les composants fournis à la construction', function (): void {
     $db = new ComponentStatus('database', 'ok', 'Connected');
     $redis = new ComponentStatus('redis', 'ok', 'Connected');
 
@@ -60,7 +60,7 @@ test('HealthReport expose les composants fournis à la construction', static fun
         ->and($report->getComponents()[1]->name)->toBe('redis');
 });
 
-test('HealthReport est immuable — modifier la liste source ne change pas le rapport', static function (): void {
+test('HealthReport est immuable — modifier la liste source ne change pas le rapport', function (): void {
     $components = [new ComponentStatus('database', 'ok', 'Connected')];
     $report = new HealthReport($components);
 
@@ -71,13 +71,13 @@ test('HealthReport est immuable — modifier la liste source ne change pas le ra
         ->and($report->isHealthy())->toBeTrue();
 });
 
-test('ComponentStatus isHealthy retourne true pour status ok', static function (): void {
+test('ComponentStatus isHealthy retourne true pour status ok', function (): void {
     $status = new ComponentStatus('database', 'ok', 'Connected');
 
     expect($status->isHealthy())->toBeTrue();
 });
 
-test('ComponentStatus isHealthy retourne false pour status degraded', static function (): void {
+test('ComponentStatus isHealthy retourne false pour status degraded', function (): void {
     $status = new ComponentStatus('redis', 'degraded', 'Connection refused');
 
     expect($status->isHealthy())->toBeFalse();
