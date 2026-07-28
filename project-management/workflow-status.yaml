@@ -1,0 +1,74 @@
+# Workflow Status — Briefly AI
+project: briefly-ai
+track: enterprise
+initialized_at: 2026-07-28T00:00:00Z
+current_phase: design
+
+context:
+  type: greenfield
+  code_files: 0
+  git_repo: true
+  brief: brief.md
+  stack:
+    backend: "Symfony 8 + API Platform 4 + FrankenPHP"
+    database: "PostgreSQL + Redis"
+    infra: "Docker"
+    frontend_desktop: "à trancher (headless API vs Symfony/Twig)"
+    mobile: "Android + iOS (techno à trancher)"
+
+complexity:
+  files_impacted: "50+"          # enterprise
+  new_entities: "4+"             # enterprise (User, Source, Feed, Article, Summary, Topic, Subscription)
+  integrations: "2+"             # enterprise (Google News, RSS/Atom, LLM, Stripe, push, biométrie)
+  stories_estimated: "15+"       # enterprise
+  teams: "2+"                    # enterprise (backend, web, mobile)
+  security: "élevé"              # enterprise (auth, biométrie, RGPD, paiement)
+  verdict: enterprise
+
+open_decisions:                  # cf. brief.md §9 — à trancher en phase analyse
+  - frontend desktop (headless vs Symfony)
+  - langue de référence + i18n
+  - techno mobile (natif vs partagé)
+  - étendue traitement IA local vs serveur
+  - sources v1 (contenus payants ?)
+  - modèle tarifaire (prix, quotas free)
+  - périmètre API publique
+  - infra notifications temps réel
+  - écran "sauvegardés" desktop absent des maquettes
+
+phases:
+  analysis:
+    status: done
+    artifacts:
+      research: project-management/analysis/research-summary.md
+      constraints: project-management/analysis/constraints.md
+      risks: project-management/analysis/risks-opportunities.md
+      technical_options: project-management/analysis/technical-options.md
+      decisions: "8/9 tranchées (§9.6 prix = porteur, §9.9 écran = phase design)"
+  planning:
+    status: done
+    artifacts:
+      prd: "project-management/prd.md (60 FR, 30 NFR, gate PRD 100%)"
+      personas: project-management/personas.md
+      backlog: "8 EPICs, 52 US, 234 pts"
+      sprint1: "sprint-001-walking_skeleton — 7 US, 36 pts"
+    known_issues:
+      to_split: ["US-015", "US-016", "US-034"]
+      vertical_slicing_exception: "US-007 (frontend-only, décision PO/Tech Lead requise)"
+      hard_dependency: "US-011 dépend de US-010 (séquencer sprints)"
+  design:
+    status: ready
+    note: "Script pré-staged: scratchpad/design-workflow.js — lancement après revue du gate backlog"
+    artifacts:
+      tech_spec: pending
+      architecture: pending
+      adr: pending
+  implementation:
+    status: pending
+
+decided_by_owner:
+  pricing: "Premium 12€/mois, 99€/an ; Free = brief complet + 3 synthèses/jour"
+  sprint1_scope: "Walking Skeleton web strict validé (pas de mobile/Stripe réel/API/on-device)"
+
+next_action: "Phase Planification — PRD, personas, backlog (8 EPICs, Sprint 1 = Walking Skeleton web). Reste à confirmer : ressources équipe + budget IA"
+next_command: "/workflow:plan"

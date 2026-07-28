@@ -1,0 +1,75 @@
+# Claude-Craft Context Configuration
+# Auto-suggest skills based on file patterns (no auto-loading)
+
+file_contexts:
+  # PHP source files
+  "*.php":
+    suggest_skills:
+      - solid-principles
+      - kiss-dry-yagni
+    auto_load: false
+    quick_tips: |
+      Follow PSR-12 coding style.
+      Use strict types: declare(strict_types=1);
+      Document with PHPDoc annotations.
+
+  # Test files
+  "*Test.php":
+    suggest_skills:
+      - testing
+    auto_load: false
+    quick_tips: |
+      TDD: RED -> GREEN -> REFACTOR
+      Use PHPUnit assertions, coverage >= 80%
+
+  "**/tests/**":
+    suggest_skills:
+      - testing
+    auto_load: false
+
+  "**/Tests/**":
+    suggest_skills:
+      - testing
+    auto_load: false
+
+  # Controller/API files
+  "**/Controller/**/*.php":
+    suggest_skills:
+      - security
+    auto_load: false
+
+  "**/Http/**/*.php":
+    suggest_skills:
+      - security
+    auto_load: false
+
+  # Domain layer
+  "**/Domain/**/*.php":
+    suggest_skills:
+      - solid-principles
+    auto_load: false
+    quick_tips: |
+      Domain: Pure PHP, no framework dependencies.
+      Use value objects for immutable data.
+
+  # Entity files
+  "**/Entity/**/*.php":
+    suggest_skills:
+      - solid-principles
+    auto_load: false
+    quick_tips: |
+      Entities encapsulate business logic.
+      Keep them framework-agnostic.
+
+  # Service files
+  "**/Service/**/*.php":
+    suggest_skills:
+      - solid-principles
+      - kiss-dry-yagni
+    auto_load: false
+
+  # Documentation
+  "*.md":
+    suggest_skills:
+      - documentation
+    auto_load: false
