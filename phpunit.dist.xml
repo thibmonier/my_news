@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Briefly AI — PHPUnit 11 + Pest 3
+    Bootstrap: tests/bootstrap.php
+    Suites: Unit (Domain pur) + Feature (Symfony WebTestCase)
+    Couverture: src/ — cible ≥ 80% (constitution §4)
+-->
+<phpunit
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+    bootstrap="tests/bootstrap.php"
+    colors="true"
+    cacheDirectory=".phpunit.cache"
+    executionOrder="random"
+    failOnWarning="true"
+    failOnRisky="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage>
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <file>src/Kernel.php</file>
+        </exclude>
+        <report>
+            <text outputFile="php://stdout"/>
+            <html outputDirectory="coverage"/>
+        </report>
+    </coverage>
+
+    <php>
+        <ini name="display_errors" value="1"/>
+        <ini name="error_reporting" value="-1"/>
+        <!-- Environnement de test -->
+        <server name="APP_ENV" value="test" force="true"/>
+        <server name="APP_DEBUG" value="0" force="true"/>
+        <server name="SHELL_VERBOSITY" value="-1"/>
+        <server name="SYMFONY_PHPUNIT_REMOVE" value=""/>
+        <server name="SYMFONY_PHPUNIT_VERSION" value="11"/>
+        <!-- Kernel Symfony pour les Feature tests -->
+        <server name="KERNEL_CLASS" value="App\Kernel"/>
+        <!-- Infrastructure de test (CI : services sur 127.0.0.1 ; local : .env.test.local) -->
+        <server name="DATABASE_URL" value="postgresql://briefly:briefly@127.0.0.1:5432/briefly_test?serverVersion=16&amp;charset=utf8"/>
+        <server name="REDIS_URL" value="redis://127.0.0.1:6379"/>
+        <server name="MESSENGER_TRANSPORT_DSN" value="redis://127.0.0.1:6379/messages"/>
+    </php>
+</phpunit>

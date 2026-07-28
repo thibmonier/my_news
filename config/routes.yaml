@@ -1,0 +1,13 @@
+## Briefly AI — Route definitions
+## Presentation controllers discovered via PHP attributes.
+## API Platform resources are auto-registered by the bundle loader.
+
+controllers:
+    resource:
+        path: ../src/Presentation/Controller/
+        namespace: App\Presentation\Controller
+    type: attribute
+
+api_platform:
+    resource: .
+    type: api_platform

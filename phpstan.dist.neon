@@ -1,0 +1,33 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: max
+
+    # Analyse statique au niveau max sur le code applicatif.
+    # Les tests (closures Pest + WebTestCase) sont couverts par leur exécution, pas par PHPStan max.
+    paths:
+        - src
+
+    # PHP 8.5 — toutes les features modernes disponibles
+    phpVersion: 80500
+
+    # Strict mode (checkGenericClassInNonGenericObjectType / checkMissingIterableValueType
+    # sont implicites au level max en PHPStan 2.x)
+    reportUnmatchedIgnoredErrors: false
+
+    # Exceptions documentées (à compléter progressivement)
+    ignoreErrors:
+        # Symfony MicroKernelTrait : méthodes magiques
+        -
+            message: '#Call to an undefined method Symfony\\Component\\Config\\Loader\\LoaderInterface::load\(\)#'
+            path: src/Kernel.php
+
+    # Exclure les proxies Doctrine générés et le cache (optionnels — peuvent ne pas exister)
+    excludePaths:
+        - var/cache (?)
+        - var/cache/* (?)
+
+    # Paramètres strict supplémentaires
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    reportAlwaysTrueInLastCondition: true

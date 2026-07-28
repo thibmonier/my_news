@@ -1,0 +1,111 @@
+name: CI — Briefly AI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Qualité & Tests PHP ──────────────────────────────────────────────────────
+  php:
+    name: PHP Quality & Tests
+    runs-on: ubuntu-latest
+
+    services:
+      # PostgreSQL pour les Feature tests (tech-spec §13.1)
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: briefly_test
+          POSTGRES_USER: briefly
+          POSTGRES_PASSWORD: briefly
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      # Redis pour les Feature tests (tech-spec §13.1)
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo_pgsql, intl, opcache, redis, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      # ── Étape 1 : Validation du manifeste ────────────────────────────────────
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      # ── Étape 2 : Installation ───────────────────────────────────────────────
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # ── Étape 3 : Code style (bloquant CI — tech-spec §13.4) ────────────────
+      - name: PHP CS Fixer (dry-run)
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff --no-interaction
+
+      # ── Étape 4 : Analyse statique (niveau max — tech-spec §13.4) ────────────
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+      # ── Étape 5 : Architecture hexagonale (bloquant CI) ─────────────────────
+      - name: Deptrac — vérification des couches
+        run: vendor/bin/deptrac analyse --no-progress
+
+      # ── Étape 6 : Tests (Unit + Feature) ────────────────────────────────────
+      - name: Pest — suite complète
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_here
+          DATABASE_URL: postgresql://briefly:briefly@127.0.0.1:5432/briefly_test?serverVersion=16&charset=utf8
+          REDIS_URL: redis://127.0.0.1:6379
+          MESSENGER_TRANSPORT_DSN: redis://127.0.0.1:6379/messages
+        run: vendor/bin/pest --colors=always
+
+      # ── Étape 7 : Audit sécurité des dépendances (OWASP Supply Chain #6) ───
+      - name: Composer audit — CVE scan
+        run: composer audit
+
+  # ── Lint Docker ──────────────────────────────────────────────────────────────
+  docker:
+    name: Docker lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hadolint — Dockerfile lint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning

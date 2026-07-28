@@ -1,0 +1,92 @@
+/* Briefly AI — Design Tokens (web)
+ * Source de vérité : Stitch project 7076573032400883843 (Insight Minimalist / Insight Dark) — cf ADR-011.
+ * Généré depuis project-management/design/design-tokens.md — NE PAS éditer les valeurs à la main.
+ * DRY : les templates Twig consomment ces variables, jamais de hex en dur.
+ */
+
+:root {
+  /* ---- couleur (Insight Minimalist / clair) ---- */
+  --color-emerald-accent: #10B981;   /* IA uniquement */
+  --color-deep-indigo:    #1E1B4B;
+  --color-slate-gray:     #64748B;
+  --color-primary:        #091426;
+  --color-on-primary:     #FFFFFF;
+  --color-primary-container: #1E293B;
+  --color-surface:        #F7F9FB;
+  --color-surface-card:   #FFFFFF;
+  --color-surface-border: #E2E8F0;
+  --color-on-surface:     #191C1E;
+  --color-on-surface-variant: #45474C;
+  --color-outline:        #75777D;
+  --color-secondary:      #006C49;
+  --color-error:          #BA1A1A;
+
+  /* ---- typographie ---- */
+  --font-headline: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-body:     "Inter", system-ui, -apple-system, sans-serif;
+  --font-meta:     "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --fs-headline-xl: 40px;  --lh-headline-xl: 48px;  --ls-headline: -0.02em;
+  --fs-headline-xl-mobile: 30px; --lh-headline-xl-mobile: 36px;
+  --fs-headline-md: 24px;  --lh-headline-md: 32px;
+  --fs-body-lg: 18px;      --lh-body-lg: 28px;
+  --fs-body-md: 16px;      --lh-body-md: 24px;
+  --fs-label: 12px;        --lh-label: 16px;   --ls-label: 0.05em;
+  --fs-ai-summary: 14px;   --lh-ai-summary: 20px;
+
+  /* ---- formes ---- */
+  --radius-ai:   0.125rem; /* 2px — badges IA */
+  --radius:      0.25rem;  /* 4px — cartes, champs */
+  --radius-md:   0.375rem;
+  --radius-lg:   0.5rem;
+  --radius-full: 9999px;
+
+  /* ---- espacement (rythme 8px) ---- */
+  --space-stack-sm: 0.5rem;
+  --space-stack-md: 1.5rem;
+  --space-stack-lg: 3rem;
+  --space-gutter:   1.5rem;
+  --margin-mobile:  1rem;
+  --margin-desktop: 2.5rem;
+  --read-max:       768px;
+  --browse-max:     1120px;
+}
+
+/* ---- thème sombre (Insight Dark) — toggle explicite ---- */
+:root[data-theme="dark"],
+.theme-dark {
+  --color-emerald-accent: #4EDEA3;
+  --color-primary:        #4EDEA3;
+  --color-on-primary:     #003824;
+  --color-primary-container: #10B981;
+  --color-surface:        #051424;
+  --color-surface-card:   #122131;
+  --color-surface-border: #273647;
+  --color-on-surface:     #D4E4FA;
+  --color-on-surface-variant: #BBCABF;
+  --color-outline:        #86948A;
+  --color-secondary:      #7BD0FF;
+  --color-error:          #FFB4AB;
+  --font-meta:            "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --margin-mobile:        20px;
+  --margin-desktop:       64px;
+  --browse-max:           1280px;
+}
+
+/* ---- thème sombre auto (préférence système), sauf override clair explicite ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-emerald-accent: #4EDEA3;
+    --color-primary:        #4EDEA3;
+    --color-on-primary:     #003824;
+    --color-primary-container: #10B981;
+    --color-surface:        #051424;
+    --color-surface-card:   #122131;
+    --color-surface-border: #273647;
+    --color-on-surface:     #D4E4FA;
+    --color-on-surface-variant: #BBCABF;
+    --color-outline:        #86948A;
+    --color-secondary:      #7BD0FF;
+    --color-error:          #FFB4AB;
+    --font-meta:            "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+}

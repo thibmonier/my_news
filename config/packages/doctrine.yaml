@@ -1,0 +1,55 @@
+## Briefly AI — Doctrine DBAL + ORM
+## Entités : src/Infrastructure/ uniquement (jamais src/Domain/ — constitution §4)
+## ADR-006 : PostgreSQL 16, UUIDs v4, Doctrine ORM, lazy ghost objects
+
+doctrine:
+    dbal:
+        url: '%env(resolve:DATABASE_URL)%'
+
+        # Types Symfony Bridge
+        types:
+            uuid: Symfony\Bridge\Doctrine\Types\UuidType
+
+        # Profiler (dev uniquement)
+        profiling_collect_backtrace: '%kernel.debug%'
+
+    orm:
+        auto_generate_proxy_classes: true
+        enable_lazy_ghost_objects: true
+        naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
+        report_fields_where_declared: true
+        validate_xml_mapping: true
+
+        # Mapping : attributs PHP 8 dans src/Infrastructure/ uniquement
+        auto_mapping: false
+        mappings:
+            Infrastructure:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Infrastructure'
+                prefix: 'App\Infrastructure'
+                alias: App
+
+when@test:
+    doctrine:
+        dbal:
+            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+
+when@prod:
+    doctrine:
+        orm:
+            auto_generate_proxy_classes: false
+            query_cache_driver:
+                type: pool
+                pool: doctrine.system_cache_pool
+            result_cache_driver:
+                type: pool
+                pool: doctrine.result_cache_pool
+
+    framework:
+        cache:
+            pools:
+                doctrine.result_cache_pool:
+                    adapter: cache.app
+                doctrine.system_cache_pool:
+                    adapter: cache.system

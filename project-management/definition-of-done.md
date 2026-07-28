@@ -24,7 +24,7 @@
 - [ ] Domaine (Entites, Value Objects, Interfaces) sans import d'infrastructure
 - [ ] Application (Services, Handlers) depend d'interfaces, jamais d'implementations
 - [ ] Infrastructure (Repositories Doctrine, Clients API, Mailers) implements les interfaces du domaine
-- [ ] UUID v7 non sequentiels sur toutes les nouvelles entites persistees
+- [ ] UUID v4 non sequentiels sur toutes les nouvelles entites persistees (cf ADR-006)
 
 ### Entites & base de donnees
 - [ ] Migration Doctrine generee et reversible : `php bin/console doctrine:migrations:diff` = 0 diff apres migration
@@ -128,9 +128,16 @@
 
 ## 5. Vertical Slice
 
+### Fidélité design (US UI — cf ADR-011, INV-7)
+- [ ] L'écran correspond à l'**écran Stitch référencé** (`design/screen-inventory.md`) — layout, composants, thèmes clair + sombre
+- [ ] Valeurs de design issues UNIQUEMENT des tokens (`design/design-tokens.md` / `.css`) — **0 hex/taille/espacement en dur**
+- [ ] Émeraude `#10B981` réservée à l'IA ; badge IA rayon 2px ; traçabilité IA non basée sur la seule couleur (texte + icône)
+- [ ] **Lighthouse Accessibility ≥ 90** sur la page (CI/PR), en plus de WCAG 2.1 AA
+- [ ] Aucun écran inventé hors Stitch (écran manquant → généré via Stitch d'abord)
+
 ### Web (Symfony UX)
 - [ ] Controller Symfony → Service domaine → Repository → PostgreSQL
-- [ ] Templates Twig respectant le design system Briefly AI
+- [ ] Templates Twig respectant les tokens `design-tokens.css` (design system Insight Minimalist / Insight Dark)
 - [ ] Turbo Frames / Turbo Streams fonctionnels pour les mises a jour partielles
 - [ ] Stimulus Controller si interaction JS requise
 - [ ] Responsive (mobile-first, viewport 320px — 1440px)
@@ -224,7 +231,7 @@
 ### Code
 - [ ] PSR-12 / PHPStan max / Dart analyzer : 0 erreur
 - [ ] Architecture hexagonale respectee
-- [ ] UUID v7 sur les nouvelles entites
+- [ ] UUID v4 sur les nouvelles entites
 
 ### Tests
 - [ ] Couverture >= 80%

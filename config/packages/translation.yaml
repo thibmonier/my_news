@@ -1,0 +1,11 @@
+## Briefly AI — Internationalisation (i18n)
+## tech-spec §10 : EN (référence devs) + FR (marché cible)
+## Aucune chaîne en dur dans le code — tout passe par le système de traduction
+
+framework:
+    default_locale: fr
+    translator:
+        default_path: '%kernel.project_dir%/translations'
+        fallbacks:
+            - en
+            - fr

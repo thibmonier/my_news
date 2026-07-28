@@ -1,0 +1,48 @@
+## Briefly AI — API Platform 4 configuration
+## ADR-007 : REST/JSON-LD, route prefix /api/v1, OpenAPI 3.1 auto-générée
+## Deny by default : chaque opération a un voter explicite (constitution §6)
+
+api_platform:
+    title: 'Briefly AI API'
+    description: >
+        API REST Briefly AI — Daily Brief synthétisé par IA, architecture hexagonale/DDD.
+        Synthèses : Mistral (UE, RGPD) | EdDSA JWT mobile | Sessions HttpOnly desktop.
+    version: '1.0.0'
+
+    # Chemin de base : /api/v1/... (ADR-007 §2)
+    path_prefix: /api/v1
+
+    # Formats supportés
+    formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+
+    docs_formats:
+        jsonopenapi: ['application/vnd.openapi+json']
+        jsonld: ['application/ld+json']
+        html: ['text/html']
+
+    # Defaults globaux pour toutes les ApiResource
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
+        extra_properties:
+            standard_put: true
+            rfc_7807_compliant_errors: true   # RFC 7807 Problem Details (tech-spec §6.6)
+
+    # Pagination cursor-based (ADR-007 §5)
+    collection:
+        pagination:
+            page_parameter_name: page
+            items_per_page: 25
+            maximum_items_per_page: 100
+            client_items_per_page: true
+            client_enabled: true
+
+    # OpenAPI enrichie (CI exporte docs/openapi.json)
+    openapi:
+        contact:
+            name: Briefly AI Team
+        license:
+            name: Proprietary

@@ -1,0 +1,39 @@
+# Briefly AI — Surcharges de développement (compose.override.yaml)
+# Chargé automatiquement par Docker Compose en dev.
+# NE PAS utiliser en production.
+
+services:
+
+  app:
+    build:
+      target: dev          # image dev (avec xdebug, composer)
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: "1"
+      XDEBUG_MODE: "off"   # Activer: XDEBUG_MODE=debug make up
+      XDEBUG_CONFIG: "client_host=host.docker.internal"
+    volumes:
+      # Mount du code source — rechargement à chaud
+      - .:/app:cached
+      # Exclure vendor/ du mount pour la performance
+      - app_vendor:/app/vendor
+      - app_var:/app/var
+    ports:
+      - "80:80"
+      - "443:443"
+      # Port debug Xdebug (si activé)
+      - "9003:9003"
+
+  database:
+    # Exposer le port pour les outils locaux (TablePlus, pgAdmin)
+    ports:
+      - "5432:5432"
+
+  redis:
+    # Exposer le port pour les outils locaux (RedisInsight)
+    ports:
+      - "6379:6379"
+
+volumes:
+  app_vendor:
+  app_var:

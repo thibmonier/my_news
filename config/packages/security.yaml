@@ -1,0 +1,36 @@
+## Briefly AI — Sécurité Symfony
+## Argon2id via sodium (constitution §6, jamais bcrypt/MD5/SHA1)
+## Deny by default : voters explicites sur chaque opération API Platform (ADR-007 §7)
+
+security:
+    # Hachage mots de passe : Argon2id 128 MiB / t=3 / p=1 via libsodium (constitution §6)
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+            algorithm: sodium
+
+    # Providers (Sprint 0 : placeholder — User entity en Sprint 2)
+    providers:
+        users_in_memory:
+            memory: ~
+
+    firewalls:
+        # Exclure profiler/debugger en dev
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+
+        # Firewall principal — Sprint 0 (placeholder)
+        # Sprint 2 : JWT authenticator (mobile) + session authenticator (desktop)
+        main:
+            lazy: true
+            provider: users_in_memory
+            stateless: false
+
+    # Deny by default : contrôle explicite via voters (ADR-007 §7, constitution §6)
+    access_control: []
+
+when@test:
+    security:
+        password_hashers:
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: plaintext

@@ -1,0 +1,36 @@
+## Briefly AI — Service Container
+## Autowire + autoconfigure global ; Domain exclus (PHP pur, sans DI).
+## Architecture hexagonale : Domain/Application/Infrastructure/Presentation.
+
+parameters:
+
+services:
+    # ── Defaults ──────────────────────────────────────────────────────────────
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind: {}
+
+    # ── Auto-discovery (exclut Domain — PHP pur, pas de DI framework) ─────────
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Domain/'
+            - '../src/Kernel.php'
+
+    # ── Tagging automatique des ports (interface → tag) ────────────────────────
+    _instanceof:
+        App\Domain\Health\HealthProbeInterface:
+            tags: ['app.health_probe']
+
+    # ── Application Health ─────────────────────────────────────────────────────
+    App\Application\Health\GetHealthHandler:
+        arguments:
+            $probes: !tagged_iterator 'app.health_probe'
+
+    # ── Redis (Predis client) ─────────────────────────────────────────────────
+    # Utilisé par RedisHealthProbe et autres adapters Redis.
+    Predis\Client:
+        arguments:
+            - '%env(REDIS_URL)%'
+        public: false

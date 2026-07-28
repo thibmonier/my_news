@@ -1,0 +1,26 @@
+## Briefly AI — Cache Symfony (Redis)
+## ADR-006 : Redis 7 comme couche cache éphémère
+## Namespaces : session:, brief:, synthesis:, quota:, rate: (tech-spec §9.1)
+
+framework:
+    cache:
+        # Pool principal (app) → Redis (ADR-006)
+        app: cache.adapter.redis
+        system: cache.adapter.system
+
+        # Provider Redis (REDIS_URL = redis://redis:6379)
+        default_redis_provider: '%env(REDIS_URL)%'
+
+        pools:
+            # Cache des synthèses IA — TTL 24h (tech-spec §9.1)
+            cache.synthesis:
+                adapter: cache.adapter.redis
+                default_lifetime: 86400
+                provider: '%env(REDIS_URL)%'
+                tags: true
+
+            # Cache des briefs — TTL 60s (tech-spec §9.1)
+            cache.brief:
+                adapter: cache.adapter.redis
+                default_lifetime: 60
+                provider: '%env(REDIS_URL)%'

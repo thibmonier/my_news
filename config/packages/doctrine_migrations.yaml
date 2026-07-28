@@ -1,0 +1,21 @@
+## Briefly AI — Doctrine Migrations
+## Convention de nommage : Version{YYYYMMDDHHMMSS}.php
+## Jamais modifier une migration existante — toujours en créer une nouvelle.
+
+doctrine_migrations:
+    migrations_paths:
+        DoctrineMigrations: '%kernel.project_dir%/migrations'
+
+    storage:
+        table_storage:
+            table_name: doctrine_migration_versions
+            version_column_length: 191
+
+    # Désactiver la génération en production
+    enable_profiler: false
+
+    # Vérification que 0 diff avant déploiement (tech-spec §15.3)
+    check_database_platform: true
+
+    # Rollback possible : toujours implémenter down() (tech-spec §15.3)
+    all_or_nothing: true

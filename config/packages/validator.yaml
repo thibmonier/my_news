@@ -1,0 +1,8 @@
+## Briefly AI — Validation Symfony
+## Validation côté serveur OBLIGATOIRE (constitution §4, OWASP #3)
+## Annotations PHP 8 activées.
+
+framework:
+    validation:
+        email_validation_mode: html5
+        enable_attributes: true

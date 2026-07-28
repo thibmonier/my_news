@@ -1,0 +1,86 @@
+name: briefly-ai
+
+# Briefly AI — Docker Compose (dev + prod)
+# Services: app (FrankenPHP), database (PostgreSQL 16), redis (Redis 7)
+# Noms des services = noms dans les DSN (.env) — cohérence absolue
+
+services:
+
+  # ── Application FrankenPHP ────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      target: prod
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: "${APP_ENV:-prod}"
+      APP_SECRET: "${APP_SECRET}"
+      DATABASE_URL: "${DATABASE_URL}"
+      REDIS_URL: "${REDIS_URL}"
+      MESSENGER_TRANSPORT_DSN: "${MESSENGER_TRANSPORT_DSN:-redis://redis:6379/messages}"
+      LOCK_DSN: "${LOCK_DSN:-redis://redis:6379}"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - briefly_net
+    restart: unless-stopped
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────
+  # Nom du service : "database" — doit correspondre au host dans DATABASE_URL
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-briefly}"
+      POSTGRES_USER: "${POSTGRES_USER:-briefly}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-briefly}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-briefly} -d ${POSTGRES_DB:-briefly}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - briefly_net
+    restart: unless-stopped
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────
+  # Nom du service : "redis" — doit correspondre au host dans REDIS_URL
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - redis_data:/data
+    networks:
+      - briefly_net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+
+networks:
+  briefly_net:
+    driver: bridge

@@ -1,0 +1,32 @@
+## Briefly AI — Symfony Messenger (Redis Streams)
+## ADR-006 : Redis Streams, consumer groups, DLQ
+## tech-spec §11.5 : retry strategy backoff exponentiel
+
+framework:
+    messenger:
+        # DLQ pour les messages échoués (tech-spec §11.5)
+        failure_transport: failed
+
+        transports:
+            # Transport async principal — Redis Streams (MESSENGER_TRANSPORT_DSN)
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: messenger.async
+                    group: symfony
+                    consumer: '%env(default:hostname:HOSTNAME)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000        # 1s
+                    multiplier: 2      # backoff exponentiel (tech-spec §11.5)
+                    max_delay: 60000   # 60s max
+
+            # Dead Letter Queue
+            failed:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: messenger.failed
+                    group: symfony_failed
+
+        # Routing : mappé par namespace de message (à compléter au fil des sprints)
+        routing: {}

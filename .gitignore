@@ -1,0 +1,52 @@
+###> Briefly AI ###
+/.env.local
+/.env.*.local
+/vendor/
+/var/
+###< Briefly AI ###
+
+###> symfony/framework-bundle ###
+/public/bundles/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache
+/.phpunit.result.cache
+###< phpunit/phpunit ###
+
+###> squizlabs/php_codesniffer ###
+/.phpcs-cache
+###< squizlabs/php_codesniffer ###
+
+###> friendsofphp/php-cs-fixer ###
+/.php-cs-fixer.cache
+###< friendsofphp/php-cs-fixer ###
+
+###> phpstan/phpstan ###
+# phpstan cache (CI rebuilds chaque fois)
+###< phpstan/phpstan ###
+
+###> qossmic/deptrac ###
+/.deptrac.cache
+###< qossmic/deptrac ###
+
+###> Docker ###
+/compose.override.yaml.local
+###< Docker ###
+
+###> Composer ###
+# composer.lock EST versionné (application, builds reproductibles — supply-chain constitution §6)
+###< Composer ###
+
+###> IDE ###
+/.idea/
+/.vscode/
+*.swp
+*.swo
+.DS_Store
+###< IDE ###
+
+###> Tests / Coverage ###
+/coverage/
+###< Tests / Coverage ###

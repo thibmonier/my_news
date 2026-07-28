@@ -1,0 +1,6 @@
+## Test environment — Services publics pour les Feature tests
+## Permet static::getContainer()->get(ServiceClass::class) dans PHPUnit/Pest
+
+services:
+    _defaults:
+        public: true

@@ -1,0 +1,52 @@
+# Briefly AI — .dockerignore
+# Exclure les fichiers inutiles pour réduire le contexte de build
+
+# Dépendances (régénérées dans l'image)
+/vendor/
+
+# Cache Symfony
+/var/
+
+# Données de développement
+/.git/
+/.github/
+/.idea/
+/.vscode/
+/node_modules/
+
+# Fichiers de config sensibles (jamais dans l'image)
+/.env.local
+/.env.*.local
+
+# Artefacts qualité
+/.php-cs-fixer.cache
+/.phpunit.cache
+/.deptrac.cache
+
+# Docker lui-même
+/compose.override.yaml
+/docker/
+
+# Documentation et gestion de projet
+/docs/
+/project-management/
+/Tools/
+/brief.md
+/*.md
+!/README.md
+
+# Tests (pas dans l'image de production)
+/tests/
+/phpunit.dist.xml
+/phpstan.dist.neon
+/deptrac.yaml
+/.php-cs-fixer.dist.php
+
+# CI
+/.github/
+
+# Bundles assets (reconstruits dans le container)
+/public/bundles/
+
+# Composer lock n'est pas nécessaire dans le contexte
+# (il est copié explicitement dans le Dockerfile)

@@ -2,7 +2,7 @@
 project: briefly-ai
 track: enterprise
 initialized_at: 2026-07-28T00:00:00Z
-current_phase: design
+current_phase: sprint-0-infra
 
 context:
   type: greenfield
@@ -57,12 +57,18 @@ phases:
       vertical_slicing_exception: "US-007 (frontend-only, décision PO/Tech Lead requise)"
       hard_dependency: "US-011 dépend de US-010 (séquencer sprints)"
   design:
-    status: ready
-    note: "Script pré-staged: scratchpad/design-workflow.js — lancement après revue du gate backlog"
+    status: done
+    gate_techspec: "100% (seuil 90%) ✅"
+    design_review_coverage: "82%"
     artifacts:
-      tech_spec: pending
-      architecture: pending
-      adr: pending
+      tech_spec: "project-management/tech-spec.md (1441 l.)"
+      architecture: "c4-context/container/component, erd, api, security, design-review"
+      adr: "docs/adr/ADR-001→007 (ADR-008/009/010 à créer)"
+    remaining_before_impl:
+      - "backlog: créer P-004 Admin (US-021), découper US-015/016/034 (optionnel)"
+      - "ADR-008 hexagonal DDD, ADR-009 clustering HDBSCAN, ADR-010 rétention RGPD"
+      - "gaps design-review: reading_history (G-01), CMP consent, A11y Lighthouse, source health (G-06)"
+      - "Sprint 0 infra: scaffold Symfony 8 + API Platform + Docker + remote GitHub + commit initial"
   implementation:
     status: pending
 

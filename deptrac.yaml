@@ -1,0 +1,37 @@
+# Briefly AI — Deptrac : règles d'architecture hexagonale
+# Constitution §3 + tech-spec §2.2
+# Layers: Domain / Application / Infrastructure / Presentation
+# Règles: Domain:[], Application:[Domain], Infrastructure:[Domain,Application], Presentation:[Domain,Application]
+
+deptrac:
+    paths:
+        - src
+
+    layers:
+        -   name: Domain
+            collectors:
+                -   type: directory
+                    value: src/Domain/.*
+        -   name: Application
+            collectors:
+                -   type: directory
+                    value: src/Application/.*
+        -   name: Infrastructure
+            collectors:
+                -   type: directory
+                    value: src/Infrastructure/.*
+        -   name: Presentation
+            collectors:
+                -   type: directory
+                    value: src/Presentation/.*
+
+    ruleset:
+        Domain: ~
+        Application:
+            - Domain
+        Infrastructure:
+            - Domain
+            - Application
+        Presentation:
+            - Domain
+            - Application
