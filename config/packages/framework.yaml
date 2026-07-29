@@ -38,6 +38,10 @@ framework:
     scheduler:
         enabled: true
 
+    # Formulaires Symfony (US-021 : SourceType, CSRF activé par défaut)
+    form:
+        enabled: true
+
     # Symfony Lock — anti-doublon Redis pour GenerateDailyBriefHandler (US-003/T-003-02)
     # LOCK_DSN : redis://redis:6379 (env.example)
     # Crée le service lock.default.factory (LockFactory autowirable)

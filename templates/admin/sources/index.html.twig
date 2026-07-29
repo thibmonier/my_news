@@ -1,0 +1,114 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Sources RSS — Briefly AI Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Sources RSS/Atom</h1>
+    <div style="display:flex; gap:.5rem;">
+        <form method="POST" action="{{ path('admin_sources_bulk_update') }}" style="display:inline;">
+            <input type="hidden" name="_token" value="{{ csrf_token('source_bulk') }}">
+            <button type="submit" class="btn btn-secondary"
+                    onclick="return confirm('Mettre à jour toutes les sources actives ?')">
+                ↻ Tout mettre à jour
+            </button>
+        </form>
+        <a href="{{ path('admin_sources_new') }}" class="btn btn-primary">+ Ajouter une source</a>
+    </div>
+</div>
+
+{# Barre de recherche #}
+<form method="GET" action="{{ path('admin_sources_index') }}" class="search-bar">
+    <input type="text" name="q" value="{{ query }}" placeholder="Rechercher par nom ou URL…" class="input">
+    <button type="submit" class="btn btn-secondary">Rechercher</button>
+    {% if query %}
+        <a href="{{ path('admin_sources_index') }}" class="btn btn-secondary">✕ Effacer</a>
+    {% endif %}
+</form>
+
+<div class="card">
+    {% if sources|length == 0 %}
+        <p style="text-align:center; color:#6b7280; padding: 2rem 0;">
+            Aucune source {% if query %}correspondant à « {{ query }} »{% endif %}.
+        </p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>URL</th>
+                    <th>Type</th>
+                    <th>Intervalle</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in sources %}
+                    <tr>
+                        <td><strong>{{ source.name }}</strong></td>
+                        <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer nofollow"
+                               style="color:#4f46e5; text-decoration:none;">{{ source.url }}</a>
+                        </td>
+                        <td>{{ source.feedType.value|upper }}</td>
+                        <td>{{ source.fetchIntervalMinutes }} min</td>
+                        <td>
+                            <span class="badge {{ source.status.badgeClass() }}">
+                                {{ source.status.label() }}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display:flex; gap:.375rem;">
+                                <a href="{{ path('admin_sources_edit', {id: source.id}) }}"
+                                   class="btn btn-sm btn-secondary">Éditer</a>
+
+                                {# Toggle actif/inactif #}
+                                <form method="POST" action="{{ path('admin_sources_toggle', {id: source.id}) }}"
+                                      style="display:inline;">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('source_actions') }}">
+                                    <button type="submit" class="btn btn-sm btn-secondary">
+                                        {{ source.isActive() ? 'Désactiver' : 'Activer' }}
+                                    </button>
+                                </form>
+
+                                {# Suppression avec confirmation #}
+                                <form method="POST" action="{{ path('admin_sources_delete', {id: source.id}) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Supprimer « {{ source.name|e('js') }} » ? Cette action est irréversible.')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('source_actions') }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {# Pagination #}
+        {% if totalPages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                    <a href="{{ path('admin_sources_index', {page: page - 1, q: query}) }}">‹</a>
+                {% endif %}
+                {% for p in 1..totalPages %}
+                    {% if p == page %}
+                        <span class="current">{{ p }}</span>
+                    {% else %}
+                        <a href="{{ path('admin_sources_index', {page: p, q: query}) }}">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page < totalPages %}
+                    <a href="{{ path('admin_sources_index', {page: page + 1, q: query}) }}">›</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<p style="margin-top:.75rem; color:#9ca3af; font-size:.75rem;">
+    {{ total }} source(s) au total
+    {% if query %} — filtre : « {{ query }} »{% endif %}
+</p>
+{% endblock %}

@@ -29,7 +29,7 @@ test('GET /admin/articles retourne 401 sans authentification', function (): void
 
 test('GET /admin/articles avec ROLE_ADMIN retourne 200 et une structure JSON valide', function (): void {
     $client = static::createClient();
-    $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
+    $client->loginUser(new InMemoryUser('admin', 'test', ['ROLE_ADMIN']), 'admin');
     $client->request('GET', '/admin/articles');
 
     $response = $client->getResponse();
@@ -49,7 +49,7 @@ test('GET /admin/articles avec ROLE_ADMIN retourne 200 et une structure JSON val
 
 test('GET /admin/articles?page=2 retourne la page 2 avec structure valide', function (): void {
     $client = static::createClient();
-    $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
+    $client->loginUser(new InMemoryUser('admin', 'test', ['ROLE_ADMIN']), 'admin');
     $client->request('GET', '/admin/articles?page=2');
 
     $response = $client->getResponse();
@@ -63,7 +63,7 @@ test('GET /admin/articles?page=2 retourne la page 2 avec structure valide', func
 
 test('GET /admin/articles Content-Type est application/json', function (): void {
     $client = static::createClient();
-    $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
+    $client->loginUser(new InMemoryUser('admin', 'test', ['ROLE_ADMIN']), 'admin');
     $client->request('GET', '/admin/articles');
 
     expect($client->getResponse()->headers->get('Content-Type'))
@@ -72,7 +72,7 @@ test('GET /admin/articles Content-Type est application/json', function (): void 
 
 test('GET /admin/articles chaque article expose les clés requises', function (): void {
     $client = static::createClient();
-    $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
+    $client->loginUser(new InMemoryUser('admin', 'test', ['ROLE_ADMIN']), 'admin');
     $client->request('GET', '/admin/articles');
 
     $data = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);

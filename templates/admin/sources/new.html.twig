@@ -1,0 +1,14 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Nouvelle source — Briefly AI Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Ajouter une source RSS/Atom</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    {% block submit_label %}Créer la source{% endblock %}
+    {% include 'admin/sources/_form.html.twig' %}
+</div>
+{% endblock %}

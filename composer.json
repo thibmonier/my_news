@@ -19,6 +19,7 @@
         "symfony/cache": "^8.0",
         "symfony/console": "^8.0",
         "symfony/dotenv": "^8.0",
+        "symfony/form": "*",
         "symfony/framework-bundle": "^8.0",
         "symfony/http-client": "^8.1",
         "symfony/lock": "^8.1",
@@ -28,6 +29,7 @@
         "symfony/scheduler": "^8.1",
         "symfony/security-bundle": "^8.0",
         "symfony/translation": "^8.0",
+        "symfony/twig-bundle": "*",
         "symfony/uid": "^8.0",
         "symfony/validator": "^8.0",
         "symfony/yaml": "^8.0"

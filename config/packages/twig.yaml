@@ -1,0 +1,6 @@
+## Briefly AI — Twig configuration
+## Sprint 2 : ajout du moteur de templates pour l'interface admin
+
+twig:
+    default_path: '%kernel.project_dir%/templates'
+    strict_variables: true

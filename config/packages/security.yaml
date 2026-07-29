@@ -14,12 +14,11 @@ security:
     providers:
         # Sprint 1 : admin en mémoire pour l'UI /admin (Walking Skeleton — ADR-005).
         # Sprint 2 : remplacé par OAuth2 (Google/GitHub) + JWT mobile.
+        # Production : aucun utilisateur défini — le provider existe pour le firewall admin.
+        # Les utilisateurs réels sont définis dans when@test: uniquement (tests) ou OAuth2 (prod Sprint 2).
         users_in_memory:
             memory:
-                users:
-                    admin:
-                        password: '$argon2id$v=19$m=65536,t=4,p=1$bWVtb3J5dGVzdA$dummyhashforsprintoneonlyreplaceinsprint2'
-                        roles: ['ROLE_ADMIN']
+                users: []
 
         # US-030 : Utilisateurs inscrits par email — provider Doctrine.
         app_users:
@@ -33,13 +32,13 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
 
-        # Firewall admin — HTTP Basic pour /admin (Sprint 1 uniquement, remplacé Sprint 2)
+        # Firewall admin — HTTP Basic + sessions pour /admin (CSRF requiert sessions — Sprint 2)
+        # stateless retiré en Sprint 2 : les formulaires CRUD nécessitent la session (CSRF tokens)
         admin:
             pattern: ^/admin
             provider: users_in_memory
             http_basic:
                 realm: 'Briefly AI Admin'
-            stateless: true
 
         # Firewall principal — form_login pour le desktop (ADR-001, ADR-005)
         # Session HttpOnly + SameSite=Strict (framework.yaml)
@@ -80,3 +79,16 @@ when@test:
                 algorithm: plaintext
             App\Infrastructure\User\Persistence\DoctrineUserEntity:
                 algorithm: plaintext
+        # Passwords MUST be non-null: InMemoryFactory uses container.build_id for null passwords,
+        # causing mismatch between loginUser(InMemoryUser(..., 'x', ...)) stored token and
+        # refreshUser() return → isEqualTo fails → 401. Use literal 'test' here and in tests.
+        providers:
+            users_in_memory:
+                memory:
+                    users:
+                        admin:
+                            password: 'test'
+                            roles: ['ROLE_ADMIN']
+                        user:
+                            password: 'test'
+                            roles: ['ROLE_USER']

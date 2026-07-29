@@ -1,0 +1,45 @@
+{{ form_start(form, {attr: {class: 'source-form', novalidate: 'novalidate'}}) }}
+
+    <div class="form-group">
+        {{ form_label(form.name) }}
+        {{ form_widget(form.name, {attr: {class: 'input'}}) }}
+        {% if form.name.vars.errors|length > 0 %}
+            {% for error in form.name.vars.errors %}
+                <p class="form-error">{{ error.message }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="form-group">
+        {{ form_label(form.url) }}
+        {{ form_widget(form.url, {attr: {class: 'input'}}) }}
+        {% if form.url.vars.errors|length > 0 %}
+            {% for error in form.url.vars.errors %}
+                <p class="form-error">{{ error.message }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="form-group">
+        {{ form_label(form.feedType) }}
+        {{ form_widget(form.feedType, {attr: {class: 'select'}}) }}
+    </div>
+
+    <div class="form-group">
+        {{ form_label(form.fetchIntervalMinutes) }}
+        {{ form_widget(form.fetchIntervalMinutes, {attr: {class: 'input'}}) }}
+        {% if form.fetchIntervalMinutes.vars.errors|length > 0 %}
+            {% for error in form.fetchIntervalMinutes.vars.errors %}
+                <p class="form-error">{{ error.message }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    {{ form_rest(form) }}
+
+    <div style="display: flex; gap: .75rem; margin-top: 1.5rem;">
+        <button type="submit" class="btn btn-primary">{% block submit_label %}Enregistrer{% endblock %}</button>
+        <a href="{{ path('admin_sources_index') }}" class="btn btn-secondary">Annuler</a>
+    </div>
+
+{{ form_end(form) }}

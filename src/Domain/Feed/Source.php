@@ -10,6 +10,9 @@ namespace App\Domain\Feed;
  * Représente une source d'actualités à ingérer périodiquement.
  * PHP pur — AUCUN attribut #[ORM], AUCUN import Symfony/Doctrine.
  * Constitution §4 : entités Domain = classes PHP pures, interfaces de repository dans le Domain.
+ *
+ * Immuable : toutes les propriétés sont readonly.
+ * Les mutations passent par la couche Application → Infrastructure repository.
  */
 final class Source
 {
@@ -26,6 +29,8 @@ final class Source
         private readonly ?\DateTimeImmutable $lastErrorAt = null,
         private readonly ?string $etag = null,
         private readonly ?string $lastModified = null,
+        private readonly int $fetchIntervalMinutes = 30,
+        private readonly ?\DateTimeImmutable $deletedAt = null,
     ) {
     }
 
@@ -78,5 +83,15 @@ final class Source
     public function getLastModified(): ?string
     {
         return $this->lastModified;
+    }
+
+    public function getFetchIntervalMinutes(): int
+    {
+        return $this->fetchIntervalMinutes;
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
     }
 }
