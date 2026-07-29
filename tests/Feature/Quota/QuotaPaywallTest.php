@@ -18,17 +18,17 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 uses(WebTestCase::class);
 
-beforeEach(static function (): void {
+beforeEach(function (): void {
     static::ensureKernelShutdown();
 });
 
-afterEach(static function (): void {
+afterEach(function (): void {
     static::ensureKernelShutdown();
 });
 
 // ── Accès sans authentification ────────────────────────────────────────────────
 
-test('GET /quota/paywall-modal sans authentification retourne 302 ou 401', static function (): void {
+test('GET /quota/paywall-modal sans authentification retourne 302 ou 401', function (): void {
     $client = static::createClient();
     $client->request('GET', '/quota/paywall-modal');
 
@@ -37,7 +37,7 @@ test('GET /quota/paywall-modal sans authentification retourne 302 ou 401', stati
 
 // ── Structure du fragment HTML (conditionnel si 200) ─────────────────────────
 
-test('GET /quota/paywall-modal retourne du HTML avec le CTA Premium désactivé (si authentifié)', static function (): void {
+test('GET /quota/paywall-modal retourne du HTML avec le CTA Premium désactivé (si authentifié)', function (): void {
     $client = static::createClient();
     $client->request('GET', '/quota/paywall-modal');
 
@@ -70,7 +70,7 @@ test('GET /quota/paywall-modal retourne du HTML avec le CTA Premium désactivé 
 
 // ── Routes enregistrées ────────────────────────────────────────────────────────
 
-test('La route /api/v1/quota est accessible (réponse non 404)', static function (): void {
+test('La route /api/v1/quota est accessible (réponse non 404)', function (): void {
     $client = static::createClient();
     $client->request('GET', '/api/v1/quota');
 
@@ -78,7 +78,7 @@ test('La route /api/v1/quota est accessible (réponse non 404)', static function
     expect($client->getResponse()->getStatusCode())->not->toBe(404);
 });
 
-test('La route /quota/paywall-modal est accessible (réponse non 404)', static function (): void {
+test('La route /quota/paywall-modal est accessible (réponse non 404)', function (): void {
     $client = static::createClient();
     $client->request('GET', '/quota/paywall-modal');
 

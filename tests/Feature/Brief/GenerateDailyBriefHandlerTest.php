@@ -6,11 +6,12 @@ use App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefHandler;
 use App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefMessage;
 use App\Domain\Brief\BriefGenerationFailedEvent;
 use App\Domain\Brief\BriefSelectorService;
+use App\Domain\Brief\BriefSelectorServiceInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Lock\LockInterface;
+use Symfony\Component\Lock\SharedLockInterface;
 
 /*
  * Feature tests — GenerateDailyBriefHandler
@@ -31,8 +32,13 @@ uses(KernelTestCase::class);
  */
 function featureLockFactoryStub(): LockFactory
 {
-    $lockMock = new class implements LockInterface {
+    $lockMock = new class implements SharedLockInterface {
         public function acquire(bool $blocking = false): bool
+        {
+            return true;
+        }
+
+        public function acquireRead(bool $blocking = false): bool
         {
             return true;
         }
@@ -62,12 +68,12 @@ function featureLockFactoryStub(): LockFactory
     };
 
     return new class($lockMock) extends LockFactory {
-        public function __construct(private readonly LockInterface $lock)
+        public function __construct(private readonly SharedLockInterface $lock)
         {
             // Bypass du constructeur parent pour les tests Feature
         }
 
-        public function createLock(string $resource, ?float $ttl = 300.0, bool $autoRelease = true): LockInterface
+        public function createLock(string $resource, ?float $ttl = 300.0, bool $autoRelease = true): SharedLockInterface
         {
             return $this->lock;
         }
@@ -86,7 +92,7 @@ test('Handler : 0 articles → BriefGenerationFailedEvent dispatché et log ERRO
         reason: 'no_articles_available',
     );
 
-    $selectorMock = $this->createMock(BriefSelectorService::class);
+    $selectorMock = $this->createMock(BriefSelectorServiceInterface::class);
     $selectorMock->method('selectTopStories')->willReturn($failedEvent);
 
     $dispatchedEvents = [];
@@ -94,7 +100,7 @@ test('Handler : 0 articles → BriefGenerationFailedEvent dispatché et log ERRO
     $dispatcherMock->expects($this->once())
         ->method('dispatch')
         ->with($this->isInstanceOf(BriefGenerationFailedEvent::class))
-        ->willReturnCallback(static function (object $event) use (&$dispatchedEvents): object {
+        ->willReturnCallback(function (object $event) use (&$dispatchedEvents): object {
             $dispatchedEvents[] = $event;
 
             return $event;
@@ -104,11 +110,11 @@ test('Handler : 0 articles → BriefGenerationFailedEvent dispatché et log ERRO
     $loggerMock = $this->createMock(LoggerInterface::class);
     $loggerMock->expects($this->atLeastOnce())
         ->method('error')
-        ->willReturnCallback(static function (string $message, array $context = []) use (&$loggedErrors): void {
+        ->willReturnCallback(function (string $message, array $context = []) use (&$loggedErrors): void {
             $loggedErrors[] = $message;
         });
-    $loggerMock->method('info')->willReturn(null);
-    $loggerMock->method('warning')->willReturn(null);
+    $loggerMock->method('info');
+    $loggerMock->method('warning');
 
     $handler = new GenerateDailyBriefHandler(
         $selectorMock,
@@ -133,7 +139,7 @@ test('Handler : timeout DB → exception propagée pour retry Messenger', functi
 
     $timeoutException = new RuntimeException('Query timeout exceeded');
 
-    $selectorMock = $this->createMock(BriefSelectorService::class);
+    $selectorMock = $this->createMock(BriefSelectorServiceInterface::class);
     $selectorMock->method('selectTopStories')->willThrowException($timeoutException);
 
     $dispatcherMock = $this->createMock(EventDispatcherInterface::class);
@@ -141,8 +147,8 @@ test('Handler : timeout DB → exception propagée pour retry Messenger', functi
 
     $loggerMock = $this->createMock(LoggerInterface::class);
     $loggerMock->expects($this->atLeastOnce())->method('error');
-    $loggerMock->method('info')->willReturn(null);
-    $loggerMock->method('warning')->willReturn(null);
+    $loggerMock->method('info');
+    $loggerMock->method('warning');
 
     $handler = new GenerateDailyBriefHandler(
         $selectorMock,
@@ -162,7 +168,7 @@ test('Handler : timeout DB → exception propagée pour retry Messenger', functi
 test('Handler : sélection réussie → log INFO brief.batch_success émis, pas d\'événement dispatché', function (): void {
     self::bootKernel();
 
-    $selectorMock = $this->createMock(BriefSelectorService::class);
+    $selectorMock = $this->createMock(BriefSelectorServiceInterface::class);
     $selectorMock->method('selectTopStories')->willReturn(null); // Succès
 
     $dispatcherMock = $this->createMock(EventDispatcherInterface::class);
@@ -170,11 +176,11 @@ test('Handler : sélection réussie → log INFO brief.batch_success émis, pas 
 
     $loggedInfos = [];
     $loggerMock = $this->createMock(LoggerInterface::class);
-    $loggerMock->method('error')->willReturn(null);
-    $loggerMock->method('warning')->willReturn(null);
+    $loggerMock->method('error');
+    $loggerMock->method('warning');
     $loggerMock->expects($this->atLeastOnce())
         ->method('info')
-        ->willReturnCallback(static function (string $message, array $context = []) use (&$loggedInfos): void {
+        ->willReturnCallback(function (string $message, array $context = []) use (&$loggedInfos): void {
             $loggedInfos[] = $context['event'] ?? $message;
         });
 
@@ -189,12 +195,12 @@ test('Handler : sélection réussie → log INFO brief.batch_success émis, pas 
     $handler($msg);
 
     expect($loggedInfos)->not->toBeEmpty('log INFO émis');
-    expect($loggedInfos)->toContain('brief.batch_success', 'log brief.batch_success attendu');
+    expect($loggedInfos)->toContain('brief.batch_success'); // brief.batch_success attendu
 })->group('handler');
 
 // ── Test : service autowired dans le conteneur ────────────────────────────────
 
-test('BriefSelectorService est correctement auto-câblé dans le conteneur', static function (): void {
+test('BriefSelectorService est correctement auto-câblé dans le conteneur', function (): void {
     self::bootKernel();
     $container = static::getContainer();
 
@@ -202,7 +208,7 @@ test('BriefSelectorService est correctement auto-câblé dans le conteneur', sta
     expect($service)->toBeInstanceOf(BriefSelectorService::class);
 })->group('container');
 
-test('GenerateDailyBriefHandler est correctement auto-câblé dans le conteneur', static function (): void {
+test('GenerateDailyBriefHandler est correctement auto-câblé dans le conteneur', function (): void {
     self::bootKernel();
     $container = static::getContainer();
 

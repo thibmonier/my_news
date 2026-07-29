@@ -19,17 +19,17 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 uses(WebTestCase::class);
 
-beforeEach(static function (): void {
+beforeEach(function (): void {
     static::ensureKernelShutdown();
 });
 
-afterEach(static function (): void {
+afterEach(function (): void {
     static::ensureKernelShutdown();
 });
 
 // ── Accès non authentifié ──────────────────────────────────────────────────────
 
-test('GET /api/v1/quota sans authentification retourne 302 vers /login', static function (): void {
+test('GET /api/v1/quota sans authentification retourne 302 vers /login', function (): void {
     $client = static::createClient();
     $client->request('GET', '/api/v1/quota');
 
@@ -40,7 +40,7 @@ test('GET /api/v1/quota sans authentification retourne 302 vers /login', static 
 
 // ── Structure de la réponse (requiert Redis + authentification) ────────────────
 
-test('GET /api/v1/quota retourne un JSON avec les clés used, limit, remaining', static function (): void {
+test('GET /api/v1/quota retourne un JSON avec les clés used, limit, remaining', function (): void {
     // Ce test nécessite Redis disponible + un utilisateur authentifié en session.
     // Sans infrastructure → 302/401 toléré (infrastructure indisponible = skip).
     $client = static::createClient();
@@ -68,7 +68,7 @@ test('GET /api/v1/quota retourne un JSON avec les clés used, limit, remaining',
 
 // ── Contenu de la réponse 503 (Redis KO simulé) ────────────────────────────────
 
-test('GET /api/v1/quota retourne 503 avec JSON structuré si Redis KO', static function (): void {
+test('GET /api/v1/quota retourne 503 avec JSON structuré si Redis KO', function (): void {
     // Test conditionnel : vérifie la structure si un 503 est retourné
     $client = static::createClient();
     $client->request('GET', '/api/v1/quota');

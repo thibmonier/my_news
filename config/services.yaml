@@ -96,6 +96,9 @@ services:
     # BriefSelectorService est en Domain (logique pure) mais requiert le DI
     # car ses dépendances sont des interfaces Domain (ports secondaires).
     # Le Domain est exclu de l'auto-discovery — définition manuelle requise (DIP).
+    App\Domain\Brief\BriefSelectorServiceInterface:
+        alias: App\Domain\Brief\BriefSelectorService
+
     App\Domain\Brief\BriefSelectorService:
         arguments:
             $articleCandidateRepository: '@App\Domain\Brief\ArticleCandidateRepositoryInterface'

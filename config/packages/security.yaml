@@ -43,9 +43,11 @@ security:
 
         # Firewall principal — form_login pour le desktop (ADR-001, ADR-005)
         # Session HttpOnly + SameSite=Strict (framework.yaml)
+        # entry_point personnalisé : JSON 401 pour /api/* (OWASP A05), redirect /login pour le web.
         main:
             lazy: true
             provider: app_users
+            entry_point: App\Presentation\Security\ApiAuthenticationEntryPoint
             form_login:
                 login_path: /login
                 check_path: /login
@@ -66,6 +68,8 @@ security:
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/dashboard, roles: ROLE_USER }
         - { path: ^/api/v1/quota, roles: ROLE_USER }          # US-033 : quota endpoint authentifié
+        - { path: ^/api/v1/synthesis, roles: ROLE_USER }    # US-010 : synthèse IA — authentification requise
+        - { path: ^/api/v1/articles, roles: ROLE_USER }     # US-010/US-033 : synthesize par article ID
         - { path: ^/quota/paywall-modal, roles: ROLE_USER }  # US-033 : paywall modal authentifié
         - { path: ^/api/v1, roles: PUBLIC_ACCESS }           # API Platform — voters sur chaque opération
 

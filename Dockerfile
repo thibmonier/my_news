@@ -78,6 +78,9 @@ FROM base AS prod
 COPY --from=deps /app/vendor ./vendor
 COPY . .
 
+# OPcache preload activé seulement ici (le code + config/preload.php sont présents)
+COPY --link docker/php/preload.ini $PHP_INI_DIR/app.conf.d/20-preload.ini
+
 # Warmup cache Symfony
 RUN php bin/console cache:warmup --env=prod \
     && chown -R www-data:www-data var/ public/

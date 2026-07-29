@@ -29,19 +29,19 @@ use App\Presentation\StateProcessor\UrlSynthesisProcessor;
  * Couche Presentation (deptrac : Presentation → Domain, Application).
  */
 #[ApiResource(
-    routePrefix: '/v1',
+    routePrefix: '/api/v1',
     operations: [
         // ── US-033 : synthèse stub par ID d'article ────────────────────────────
+        // Auth : ROLE_USER enforced at firewall level (access_control security.yaml).
+        // symfony/expression-language n'est pas installé en Sprint 1 → pas de security= ici.
         new Post(
             uriTemplate: '/articles/{id}/synthesize',
-            security: 'is_granted("ROLE_USER")',
             processor: QuotaStateProcessor::class,
             output: SynthesisResource::class,
         ),
         // ── US-010 : synthèse Mistral réelle par URL ───────────────────────────
         new Post(
             uriTemplate: '/synthesis',
-            security: 'is_granted("ROLE_USER")',
             processor: UrlSynthesisProcessor::class,
             output: SynthesisResource::class,
         ),

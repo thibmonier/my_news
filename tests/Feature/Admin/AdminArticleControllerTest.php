@@ -20,14 +20,14 @@ use Symfony\Component\Security\Core\User\InMemoryUser;
  */
 uses(WebTestCase::class);
 
-test('GET /admin/articles retourne 401 sans authentification', static function (): void {
+test('GET /admin/articles retourne 401 sans authentification', function (): void {
     $client = static::createClient();
     $client->request('GET', '/admin/articles');
 
     expect($client->getResponse()->getStatusCode())->toBe(401);
 });
 
-test('GET /admin/articles avec ROLE_ADMIN retourne 200 et une structure JSON valide', static function (): void {
+test('GET /admin/articles avec ROLE_ADMIN retourne 200 et une structure JSON valide', function (): void {
     $client = static::createClient();
     $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
     $client->request('GET', '/admin/articles');
@@ -47,7 +47,7 @@ test('GET /admin/articles avec ROLE_ADMIN retourne 200 et une structure JSON val
         ->and($data['articles'])->toBeArray();
 });
 
-test('GET /admin/articles?page=2 retourne la page 2 avec structure valide', static function (): void {
+test('GET /admin/articles?page=2 retourne la page 2 avec structure valide', function (): void {
     $client = static::createClient();
     $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
     $client->request('GET', '/admin/articles?page=2');
@@ -61,7 +61,7 @@ test('GET /admin/articles?page=2 retourne la page 2 avec structure valide', stat
         ->and($data['perPage'])->toBe(50);
 });
 
-test('GET /admin/articles Content-Type est application/json', static function (): void {
+test('GET /admin/articles Content-Type est application/json', function (): void {
     $client = static::createClient();
     $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
     $client->request('GET', '/admin/articles');
@@ -70,7 +70,7 @@ test('GET /admin/articles Content-Type est application/json', static function ()
         ->toContain('application/json');
 });
 
-test('GET /admin/articles chaque article expose les clés requises', static function (): void {
+test('GET /admin/articles chaque article expose les clés requises', function (): void {
     $client = static::createClient();
     $client->loginUser(new InMemoryUser('admin', null, ['ROLE_ADMIN']));
     $client->request('GET', '/admin/articles');

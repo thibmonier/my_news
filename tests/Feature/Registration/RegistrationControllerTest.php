@@ -34,11 +34,11 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 uses(WebTestCase::class);
 
 // Isoler le kernel entre chaque test (nécessaire avec WebTestCase + Pest)
-beforeEach(static function (): void {
+beforeEach(function (): void {
     static::ensureKernelShutdown();
 });
 
-afterEach(static function (): void {
+afterEach(function (): void {
     static::ensureKernelShutdown();
 });
 
@@ -61,7 +61,7 @@ function fetchCsrfToken(Symfony\Bundle\FrameworkBundle\KernelBrowser $client): s
 
 // ── GET /register ──────────────────────────────────────────────────────────────
 
-test('GET /register retourne 200 avec le formulaire HTML', static function (): void {
+test('GET /register retourne 200 avec le formulaire HTML', function (): void {
     $client = static::createClient();
     $client->request('GET', '/register');
 
@@ -73,13 +73,13 @@ test('GET /register retourne 200 avec le formulaire HTML', static function (): v
         ->and((string) $client->getResponse()->getContent())->toContain('name="_csrf_token"');
 });
 
-test('GET /register contient le lien vers /login', static function (): void {
+test('GET /register contient le lien vers /login', function (): void {
     $client = static::createClient();
     $client->request('GET', '/register');
     expect((string) $client->getResponse()->getContent())->toContain('href="/login"');
 });
 
-test('GET /register contient les liens CGU et politique de confidentialité', static function (): void {
+test('GET /register contient les liens CGU et politique de confidentialité', function (): void {
     $client = static::createClient();
     $client->request('GET', '/register');
     $content = (string) $client->getResponse()->getContent();
@@ -89,7 +89,7 @@ test('GET /register contient les liens CGU et politique de confidentialité', st
 
 // ── Validation — CSRF ──────────────────────────────────────────────────────────
 
-test('POST /register sans token CSRF retourne 422', static function (): void {
+test('POST /register sans token CSRF retourne 422', function (): void {
     $client = static::createClient();
 
     // On récupère d'abord la page pour init la session, puis on POST avec un token invalide
@@ -109,7 +109,7 @@ test('POST /register sans token CSRF retourne 422', static function (): void {
 
 // ── Validation — Mot de passe ──────────────────────────────────────────────────
 
-test('POST /register avec mot de passe trop court retourne 422 avec message spécifique', static function (): void {
+test('POST /register avec mot de passe trop court retourne 422 avec message spécifique', function (): void {
     $client = static::createClient();
     $csrfToken = fetchCsrfToken($client);
 
@@ -125,7 +125,7 @@ test('POST /register avec mot de passe trop court retourne 422 avec message spé
         ->and((string) $client->getResponse()->getContent())->toContain('12 caractères');
 });
 
-test('POST /register avec mot de passe sans majuscule retourne 422', static function (): void {
+test('POST /register avec mot de passe sans majuscule retourne 422', function (): void {
     $client = static::createClient();
     $csrfToken = fetchCsrfToken($client);
 
@@ -143,7 +143,7 @@ test('POST /register avec mot de passe sans majuscule retourne 422', static func
 
 // ── Validation — CGU ───────────────────────────────────────────────────────────
 
-test('POST /register sans case CGU cochée retourne 422', static function (): void {
+test('POST /register sans case CGU cochée retourne 422', function (): void {
     $client = static::createClient();
     $csrfToken = fetchCsrfToken($client);
 
@@ -161,7 +161,7 @@ test('POST /register sans case CGU cochée retourne 422', static function (): vo
 
 // ── Validation — Email invalide ────────────────────────────────────────────────
 
-test('POST /register avec email invalide retourne 422', static function (): void {
+test('POST /register avec email invalide retourne 422', function (): void {
     $client = static::createClient();
     $csrfToken = fetchCsrfToken($client);
 
@@ -179,7 +179,7 @@ test('POST /register avec email invalide retourne 422', static function (): void
 
 // ── Dashboard (accès non authentifié) ─────────────────────────────────────────
 
-test('GET /dashboard sans authentification redirige vers /login', static function (): void {
+test('GET /dashboard sans authentification redirige vers /login', function (): void {
     $client = static::createClient();
     $client->request('GET', '/dashboard');
 
@@ -193,7 +193,7 @@ test('GET /dashboard sans authentification redirige vers /login', static functio
 
 // ── Inscription réussie (nécessite DB — groupe database) ──────────────────────
 
-test('POST /register nominal crée un utilisateur et redirige vers /dashboard', static function (): void {
+test('POST /register nominal crée un utilisateur et redirige vers /dashboard', function (): void {
     $client = static::createClient();
     $csrfToken = fetchCsrfToken($client);
 
@@ -220,7 +220,7 @@ test('POST /register nominal crée un utilisateur et redirige vers /dashboard', 
 
 // ── Email dupliqué (nécessite DB — groupe database) ───────────────────────────
 
-test('POST /register email déjà utilisé retourne 200 avec message sans fuite d\'info', static function (): void {
+test('POST /register email déjà utilisé retourne 200 avec message sans fuite d\'info', function (): void {
     $client = static::createClient();
     $csrfToken = fetchCsrfToken($client);
 

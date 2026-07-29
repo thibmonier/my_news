@@ -85,9 +85,13 @@ final class RegistrationController
 
         $csrfToken = $this->csrfTokenManager->getToken(self::CSRF_TOKEN_ID)->getValue();
 
+        // Duplicate-email is a "soft" case: return 200 (anti-enumeration OWASP A07).
+        // Real validation errors (CSRF, format, missing fields) still return 422.
+        $validationErrors = array_diff_key($errors, ['_email_exists' => null]);
+
         return new Response(
             content: $this->renderForm($formData, $errors, $csrfToken),
-            status: [] !== $errors ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK,
+            status: [] !== $validationErrors ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK,
         );
     }
 
@@ -132,9 +136,11 @@ final class RegistrationController
                 fullName: $fullName,
             ));
         } catch (EmailAlreadyExistsException) {
+            // Anti-enumeration: use '_email_exists' key so the HTTP response is 200,
+            // not 422, preventing account discovery via status code (OWASP A07).
             return [
                 [
-                    'email' => 'Un compte existe déjà pour cet email. Connectez-vous ou réinitialisez votre mot de passe.',
+                    '_email_exists' => 'Un compte existe déjà pour cet email. Connectez-vous ou réinitialisez votre mot de passe.',
                 ],
                 $formData,
                 null,
@@ -245,6 +251,13 @@ final class RegistrationController
             htmlspecialchars($csrfError, \ENT_QUOTES | \ENT_HTML5),
         ) : '';
 
+        // Anti-enumeration: duplicate email shown as informational message at HTTP 200.
+        $emailExistsMsg = $errors['_email_exists'] ?? null;
+        $emailExistsHtml = null !== $emailExistsMsg ? \sprintf(
+            '<div class="info-msg" role="status">%s</div>',
+            htmlspecialchars($emailExistsMsg, \ENT_QUOTES | \ENT_HTML5),
+        ) : '';
+
         return <<<HTML
             <!DOCTYPE html>
             <html lang="fr">
@@ -261,6 +274,7 @@ final class RegistrationController
                     }
                     .error { color: #dc2626; font-size: .875rem; margin-top: .25rem; }
                     .error.global { background: #fee2e2; padding: .75rem; border-radius: 4px; }
+                    .info-msg { background: #dbeafe; color: #1e40af; padding: .75rem; border-radius: 4px; margin-bottom: 1rem; }
                     button[type="submit"] {
                         margin-top: 1.5rem; width: 100%; padding: .75rem;
                         background: #10B981; color: white; border: none; border-radius: 4px;
@@ -277,6 +291,7 @@ final class RegistrationController
             <body>
                 <h1>Créer un compte</h1>
                 {$globalError}
+                {$emailExistsHtml}
                 <form method="POST" action="/register" novalidate>
                     <input type="hidden" name="_csrf_token" value="{$token}">
 

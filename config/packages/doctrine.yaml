@@ -32,12 +32,13 @@ doctrine:
 when@test:
     doctrine:
         dbal:
-            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+            # dbname_suffix disabled: DATABASE_URL already targets briefly_test explicitly
+            url: '%env(resolve:DATABASE_URL)%'
 
 when@prod:
     doctrine:
         orm:
-            auto_generate_proxy_classes: false
+            # auto_generate_proxy_classes retiré en Doctrine ORM 3.x (proxies gérés automatiquement)
             query_cache_driver:
                 type: pool
                 pool: doctrine.system_cache_pool

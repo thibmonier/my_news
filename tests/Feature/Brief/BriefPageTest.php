@@ -28,7 +28,7 @@ uses(WebTestCase::class);
 
 // ── GET /brief — Comportement HTTP de base ────────────────────────────────────
 
-test('GET /brief retourne une réponse HTML (200 ou 503)', static function (): void {
+test('GET /brief retourne une réponse HTML (200 ou 503)', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -39,7 +39,7 @@ test('GET /brief retourne une réponse HTML (200 ou 503)', static function (): v
         ->and($response->headers->get('Content-Type'))->toContain('text/html');
 });
 
-test('GET /brief ne contient jamais de stacktrace PHP', static function (): void {
+test('GET /brief ne contient jamais de stacktrace PHP', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -54,7 +54,7 @@ test('GET /brief ne contient jamais de stacktrace PHP', static function (): void
         ->not->toContain('password=');
 });
 
-test('GET /brief contient DAILY BRIEF dans le HTML quand réponse 200', static function (): void {
+test('GET /brief contient DAILY BRIEF dans le HTML quand réponse 200', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -68,7 +68,7 @@ test('GET /brief contient DAILY BRIEF dans le HTML quand réponse 200', static f
     }
 });
 
-test('GET /brief en 200 contient LAST UPDATED', static function (): void {
+test('GET /brief en 200 contient LAST UPDATED', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -86,7 +86,7 @@ test('GET /brief en 200 contient LAST UPDATED', static function (): void {
 
 // ── Headers de sécurité (T-001-07 + T-001-10) ───────────────────────────────
 
-test('GET /brief retourne les headers de sécurité requis', static function (): void {
+test('GET /brief retourne les headers de sécurité requis', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -100,7 +100,7 @@ test('GET /brief retourne les headers de sécurité requis', static function ():
         ->and($headers->has('Content-Security-Policy'))->toBeTrue();
 });
 
-test('GET /brief retourne Cross-Origin headers (2026)', static function (): void {
+test('GET /brief retourne Cross-Origin headers (2026)', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -112,7 +112,7 @@ test('GET /brief retourne Cross-Origin headers (2026)', static function (): void
 
 // ── Scénario 503 : header Retry-After ────────────────────────────────────────
 
-test('réponse 503 contient le header Retry-After: 60', static function (): void {
+test('réponse 503 contient le header Retry-After: 60', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 
@@ -127,7 +127,7 @@ test('réponse 503 contient le header Retry-After: 60', static function (): void
 
 // ── GET / → redirect 301 vers /brief (T-001-03 + T-001-11) ───────────────────
 
-test('GET / retourne un redirect 301 vers /brief', static function (): void {
+test('GET / retourne un redirect 301 vers /brief', function (): void {
     $client = static::createClient();
     $client->request('GET', '/');
 
@@ -137,7 +137,7 @@ test('GET / retourne un redirect 301 vers /brief', static function (): void {
         ->and($response->headers->get('Location'))->toBe('/brief');
 });
 
-test('GET / sans suivre les redirects → 301', static function (): void {
+test('GET / sans suivre les redirects → 301', function (): void {
     $client = static::createClient();
     $client->followRedirects(false);
     $client->request('GET', '/');
@@ -147,7 +147,7 @@ test('GET / sans suivre les redirects → 301', static function (): void {
 
 // ── Accessibilité de base ──────────────────────────────────────────────────────
 
-test('GET /brief est accessible sans authentification', static function (): void {
+test('GET /brief est accessible sans authentification', function (): void {
     // Pas de cookies de session, pas de headers d'auth
     $client = static::createClient();
     $client->request('GET', '/brief');
@@ -156,7 +156,7 @@ test('GET /brief est accessible sans authentification', static function (): void
     expect($client->getResponse()->getStatusCode())->not->toBeIn([401, 403]);
 });
 
-test('GET /brief contient une balise <title>', static function (): void {
+test('GET /brief contient une balise <title>', function (): void {
     $client = static::createClient();
     $client->request('GET', '/brief');
 

@@ -19,17 +19,17 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 uses(WebTestCase::class);
 
-beforeEach(static function (): void {
+beforeEach(function (): void {
     static::ensureKernelShutdown();
 });
 
-afterEach(static function (): void {
+afterEach(function (): void {
     static::ensureKernelShutdown();
 });
 
 // ── Route enregistrée ─────────────────────────────────────────────────────────
 
-test('POST /api/v1/synthesis est une route enregistrée (non 404)', static function (): void {
+test('POST /api/v1/synthesis est une route enregistrée (non 404)', function (): void {
     $client = static::createClient();
     $client->request(
         'POST',
@@ -45,7 +45,7 @@ test('POST /api/v1/synthesis est une route enregistrée (non 404)', static funct
 
 // ── Authentification requise ──────────────────────────────────────────────────
 
-test('POST /api/v1/synthesis sans authentification retourne 401', static function (): void {
+test('POST /api/v1/synthesis sans authentification retourne 401', function (): void {
     $client = static::createClient();
     $client->request(
         'POST',
@@ -61,7 +61,7 @@ test('POST /api/v1/synthesis sans authentification retourne 401', static functio
 
 // ── Absence de stacktrace dans les erreurs (OWASP A05) ───────────────────────
 
-test('réponse 401 ne contient pas de stacktrace PHP (OWASP A05)', static function (): void {
+test('réponse 401 ne contient pas de stacktrace PHP (OWASP A05)', function (): void {
     $client = static::createClient();
     $client->request(
         'POST',
@@ -81,7 +81,7 @@ test('réponse 401 ne contient pas de stacktrace PHP (OWASP A05)', static functi
 
 // ── Content-Type JSON ─────────────────────────────────────────────────────────
 
-test('POST /api/v1/synthesis retourne du JSON', static function (): void {
+test('POST /api/v1/synthesis retourne du JSON', function (): void {
     $client = static::createClient();
     $client->request(
         'POST',
@@ -104,7 +104,7 @@ test('POST /api/v1/synthesis retourne du JSON', static function (): void {
 
 // ── Opération US-033 non cassée ───────────────────────────────────────────────
 
-test('POST /api/v1/articles/{id}/synthesize toujours enregistrée (US-033 non cassée)', static function (): void {
+test('POST /api/v1/articles/{id}/synthesize toujours enregistrée (US-033 non cassée)', function (): void {
     $client = static::createClient();
     $client->request(
         'POST',
