@@ -1,0 +1,19 @@
+# Briefly AI — Caddyfile développement
+# Mode classique php_server (pas de worker) pour éviter les 405 HTTP/2 en dev.
+# Utilisé via `command: ["frankenphp","run","--config","/app/docker/Caddyfile"]`
+# dans compose.override.yaml (service app).
+# NE PAS utiliser en production (auto_https disable_redirects + tls internal).
+
+{
+    frankenphp
+    auto_https disable_redirects
+}
+
+localhost {
+    root * /app/public
+    encode zstd br gzip
+
+    php_server
+
+    tls internal
+}

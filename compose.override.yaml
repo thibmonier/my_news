@@ -7,6 +7,8 @@ services:
   app:
     build:
       target: dev          # image dev (avec xdebug, composer)
+    # Mode classique php_server (pas de worker) — évite les 405 HTTP/2 en dev.
+    command: ["frankenphp", "run", "--config", "/app/docker/Caddyfile"]
     environment:
       APP_ENV: dev
       APP_DEBUG: "1"

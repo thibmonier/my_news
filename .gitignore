@@ -47,6 +47,10 @@
 .DS_Store
 ###< IDE ###
 
+###> Outils locaux ###
+/.gitwandrc
+###< Outils locaux ###
+
 ###> Tests / Coverage ###
 /coverage/
 /tests/junit*.xml
