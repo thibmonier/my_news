@@ -9,7 +9,7 @@
 | **Persona** | P-004 Sophie — Administratrice de la plateforme (bénéficiaire indirect : P-002 Priya — chercheuse en stratégie, 31 ans) |
 | **Story Points** | 5 (Fibonacci) |
 | **Priorité** | Must Have (MoSCoW) |
-| **Sprint** | backlog |
+| **Sprint** | sprint-002-enrichissement |
 
 ## User Story (3 C)
 
