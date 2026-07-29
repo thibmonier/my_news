@@ -27,6 +27,10 @@ final readonly class BriefStoryPublicView
         public readonly string $excerpt,
         /** Nom de la source RSS/Atom. */
         public readonly string $sourceName,
+        /** UUID de l'article (clé de cache condensé IA — US-004). */
+        public readonly string $articleId = '',
+        /** Contenu brut de l'article pour la génération du condensé IA (US-004). */
+        public readonly string $rawContent = '',
     ) {
     }
 }

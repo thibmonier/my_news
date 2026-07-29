@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Presentation\ViewModel;
 
+use App\Domain\Summary\ArticleSummary;
+
 /**
  * ViewModel — Une histoire dans la vue publique du Daily Brief (US-001/T-001-05).
  *
@@ -13,8 +15,10 @@ namespace App\Presentation\ViewModel;
  * position    : formaté en "01", "02", "03" (invariant INV-1).
  * excerpt     : déjà tronqué à 280 chars (logique dans BriefPublicViewRepositoryInterface).
  * sourceUrl   : URL externe tracée (rel="noopener noreferrer" dans le template).
+ * articleId   : UUID de l'article — utilisé pour la clé de cache condensé IA (US-004).
+ * summary     : condensé IA pré-généré ou null si indisponible (US-004).
  *
- * Couche Presentation — dépend uniquement des types PHP natifs.
+ * Couche Presentation — dépend uniquement des types PHP natifs + Domain (ArticleSummary).
  * Deptrac : Presentation:[Domain, Application].
  */
 final readonly class StoryViewModel
@@ -30,6 +34,10 @@ final readonly class StoryViewModel
         public readonly string $excerpt,
         /** URL externe de l'article original. */
         public readonly string $sourceUrl,
+        /** UUID de l'article — clé de cache condensé IA (US-004). */
+        public readonly string $articleId = '',
+        /** Condensé IA pré-généré (US-004) — null si non disponible. */
+        public readonly ?ArticleSummary $summary = null,
     ) {
     }
 }

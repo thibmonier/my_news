@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Application\Summary\ArticleSummaryServiceInterface;
 use App\Domain\Brief\BriefPublicView;
 use App\Domain\Brief\BriefPublicViewRepositoryInterface;
 use App\Domain\Brief\BriefStoryPublicView;
@@ -52,7 +53,7 @@ test('index retourne 200 quand un brief est disponible', function (): void {
 
     $logger = $this->createMock(LoggerInterface::class);
 
-    $controller = new BriefController($repository, $logger);
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $logger);
     $response = $controller->index();
 
     expect($response->getStatusCode())->toBe(Response::HTTP_OK)
@@ -63,7 +64,7 @@ test('index affiche DAILY BRIEF dans le HTML', function (): void {
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(makeBriefPublicView(3));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $response = $controller->index();
 
     expect($response->getContent())->toContain('DAILY BRIEF');
@@ -73,7 +74,7 @@ test('index affiche LAST UPDATED avec la date UTC', function (): void {
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(makeBriefPublicView(3));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $response = $controller->index();
 
     expect($response->getContent())
@@ -85,7 +86,7 @@ test('index affiche les 3 histoires numérotées 01, 02, 03', function (): void 
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(makeBriefPublicView(3));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $content = $controller->index()->getContent();
 
     expect($content)
@@ -98,7 +99,7 @@ test('index affiche les titres, sources et extraits', function (): void {
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(makeBriefPublicView(3));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $content = $controller->index()->getContent();
 
     expect($content)
@@ -112,7 +113,7 @@ test('index affiche les liens OUVRIR L\'ORIGINAL avec rel="noopener noreferrer"'
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(makeBriefPublicView(3));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $content = $controller->index()->getContent();
 
     expect($content)
@@ -124,7 +125,7 @@ test('index affiche les meta tags SEO', function (): void {
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(makeBriefPublicView(3));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $content = $controller->index()->getContent();
 
     expect($content)
@@ -144,7 +145,7 @@ test('index retourne 200 avec empty state quand aucun brief (table vide)', funct
         ->method('info')
         ->with('no_daily_brief_available', $this->anything());
 
-    $controller = new BriefController($repository, $logger);
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $logger);
     $response = $controller->index();
 
     expect($response->getStatusCode())->toBe(Response::HTTP_OK)
@@ -157,7 +158,7 @@ test('empty state ne contient pas de stacktrace PHP', function (): void {
     $repository = $this->createMock(BriefPublicViewRepositoryInterface::class);
     $repository->method('findLatestPublicView')->willReturn(null);
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $content = $controller->index()->getContent();
 
     expect($content)
@@ -178,7 +179,7 @@ test('index retourne 503 et log ERROR quand la base de données est indisponible
         ->method('error')
         ->with('brief.db_error', $this->anything());
 
-    $controller = new BriefController($repository, $logger);
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $logger);
     $response = $controller->index();
 
     expect($response->getStatusCode())->toBe(Response::HTTP_SERVICE_UNAVAILABLE);
@@ -189,7 +190,7 @@ test('réponse 503 contient le header Retry-After: 60', function (): void {
     $repository->method('findLatestPublicView')
         ->willThrowException(new RuntimeException('Connection timeout'));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $response = $controller->index();
 
     expect($response->headers->get('Retry-After'))->toBe('60');
@@ -200,7 +201,7 @@ test('réponse 503 ne contient pas de stacktrace ni de message technique', funct
     $repository->method('findLatestPublicView')
         ->willThrowException(new RuntimeException('DSN=pgsql://postgres:secret@db:5432/briefly'));
 
-    $controller = new BriefController($repository, $this->createMock(LoggerInterface::class));
+    $controller = new BriefController($repository, $this->createMock(ArticleSummaryServiceInterface::class), $this->createMock(LoggerInterface::class));
     $content = $controller->index()->getContent();
 
     // OWASP #7 : pas de détail technique dans la réponse
@@ -216,6 +217,7 @@ test('réponse 503 ne contient pas de stacktrace ni de message technique', funct
 test('home retourne un redirect 301 vers /brief', function (): void {
     $controller = new BriefController(
         $this->createMock(BriefPublicViewRepositoryInterface::class),
+        $this->createMock(ArticleSummaryServiceInterface::class),
         $this->createMock(LoggerInterface::class),
     );
 

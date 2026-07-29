@@ -47,7 +47,7 @@ final class DoctrineBriefPublicViewRepository implements BriefPublicViewReposito
      */
     public function findLatestPublicView(): ?BriefPublicView
     {
-        /** @var list<array{updated_at: string, position: string, article_title: string, article_url: string, excerpt: string, source_name: string}> $rows */
+        /** @var list<array{updated_at: string, position: string, article_title: string, article_url: string, excerpt: string, source_name: string, article_id: string, raw_content: string}> $rows */
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
                 SELECT
@@ -56,7 +56,9 @@ final class DoctrineBriefPublicViewRepository implements BriefPublicViewReposito
                     a.title          AS article_title,
                     a.url            AS article_url,
                     LEFT(a.raw_content, :excerpt_length) AS excerpt,
-                    s.name           AS source_name
+                    s.name           AS source_name,
+                    CAST(a.id AS TEXT) AS article_id,
+                    a.raw_content    AS raw_content
                 FROM daily_briefs db
                 JOIN brief_stories bs ON bs.brief_id = db.id
                 JOIN articles a       ON CAST(a.id AS TEXT) = CAST(bs.article_id AS TEXT)
@@ -88,6 +90,8 @@ final class DoctrineBriefPublicViewRepository implements BriefPublicViewReposito
                 articleUrl: $row['article_url'],
                 excerpt: $row['excerpt'],
                 sourceName: $row['source_name'],
+                articleId: $row['article_id'],
+                rawContent: $row['raw_content'],
             ),
             $rows,
         );

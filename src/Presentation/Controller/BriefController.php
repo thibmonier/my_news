@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Presentation\Controller;
 
+use App\Application\Summary\ArticleSummaryServiceInterface;
 use App\Domain\Brief\BriefPublicViewRepositoryInterface;
+use App\Domain\Summary\ArticleSummary;
 use App\Presentation\ViewModel\DailyBriefViewModel;
 use App\Presentation\ViewModel\StoryViewModel;
 use Psr\Log\LoggerInterface;
@@ -13,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Contrôleur — Page web publique du Daily Brief (US-001).
+ * Contrôleur — Page web publique du Daily Brief (US-001 + US-004).
  *
  * Routes :
  *   GET /brief → 200 (page brief ou empty state)
@@ -23,17 +25,19 @@ use Symfony\Component\Routing\Attribute\Route;
  * Pas de CSRF sur GET (constitution §6, US-001 critère sécurité).
  *
  * Gestion des états :
- * - Brief disponible    → 200 + HTML avec 3 histoires numérotées 01/02/03
+ * - Brief disponible    → 200 + HTML avec 3 histoires numérotées 01/02/03 + condensés IA (US-004)
  * - Table vide          → 200 + message "Brief en cours de préparation"
  * - Erreur base données → 503 + message générique + header Retry-After: 60
+ *
+ * US-004 — Condensé IA par article :
+ * - Appel à ArticleSummaryService pour chaque histoire avant le rendu Twig
+ * - Badge "BRIEFLY AI:" accent émeraude #10B981
+ * - Mode dégradé : badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" si LLM indispo
  *
  * SÉCURITÉ OWASP #7 (Mishandling Exceptional Conditions) :
  * - Jamais de stacktrace dans la réponse HTML
  * - Messages d'erreur génériques côté client
  * - Logging côté serveur sans données personnelles
- *
- * Note Sprint 1 : HTML inline (Twig non installé).
- * À migrer vers templates/brief/index.html.twig en Sprint 2.
  *
  * Couche Presentation — dépend de Domain + Application.
  * Deptrac : Presentation:[Domain, Application].
@@ -42,6 +46,7 @@ final class BriefController
 {
     public function __construct(
         private readonly BriefPublicViewRepositoryInterface $briefRepository,
+        private readonly ArticleSummaryServiceInterface $summaryService,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -77,7 +82,30 @@ final class BriefController
             return $this->emptyStateResponse();
         }
 
-        $viewModel = DailyBriefViewModel::fromPublicView($publicView);
+        // ── US-004 : pré-génération des condensés IA pour les 3 histoires ──────
+        $summariesByPosition = [];
+
+        foreach ($publicView->stories as $story) {
+            if ('' === $story->articleId) {
+                continue;
+            }
+
+            try {
+                $summariesByPosition[$story->position] = $this->summaryService->getSummary(
+                    $story->articleId,
+                    $story->rawContent,
+                );
+            } catch (\Throwable $e) {
+                // Dégradé silencieux — un condensé manquant ne bloque pas la page
+                $this->logger->warning('brief.summary_generation_failed', [
+                    'event' => 'brief.summary_generation_failed',
+                    'position' => $story->position,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $viewModel = DailyBriefViewModel::fromPublicView($publicView, $summariesByPosition);
 
         return new Response(
             $this->renderBriefHtml($viewModel),
@@ -104,7 +132,7 @@ final class BriefController
      * SEO : title, meta description, og:title, og:description, og:url (US-001/T-001-05).
      * Turbo Drive : data-turbo="true" + import Hotwire (US-001 scénario alternatif 2).
      * Liens OUVRIR L'ORIGINAL : rel="noopener noreferrer" (US-001 conversation §6).
-     * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement à l'IA — pas utilisé ici.
+     * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement à l'IA.
      */
     private function renderBriefHtml(DailyBriefViewModel $vm): string
     {
@@ -133,6 +161,7 @@ final class BriefController
                 <meta property="og:type" content="website">
                 {$this->designTokensCss()}
                 {$this->pageCss()}
+                {$this->summaryCss()}
                 {$this->synthesisCss()}
             </head>
             <body>
@@ -168,11 +197,15 @@ final class BriefController
     }
 
     /**
-     * Génère le HTML d'une story individuelle.
+     * Génère le HTML d'une story individuelle avec son condensé IA (US-004).
      *
-     * Le lien "OUVRIR L'ORIGINAL" utilise rel="noopener noreferrer" (US-001/T-001-05).
-     * Bouton "GENERATE AI SUMMARY" déclenche un appel JS vers POST /api/v1/synthesis (US-010).
-     * Invariant INV-2 : accent émeraude (#10B981) réservé au bloc synthèse IA "BRIEFLY AI:".
+     * Bloc IA :
+     * - Badge "BRIEFLY AI:" avec icône auto_awesome (émeraude #10B981 INV-2)
+     * - Liste de 3-4 puces (keyPoints échappées — OWASP XSS)
+     * - Lien "Source : [nom]" + bouton "OUVRIR L'ORIGINAL" (rel="noopener noreferrer")
+     * - Mode dégradé : badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" sans couleur émeraude
+     *
+     * Le lien "OUVRIR L'ORIGINAL" utilise rel="noopener noreferrer" (US-001/T-001-05 + OWASP A01).
      */
     private function renderStory(StoryViewModel $story): string
     {
@@ -184,12 +217,15 @@ final class BriefController
         // Identifiant unique de la zone de synthèse (position 01/02/03)
         $zoneId = 'synthesis-result-' . $story->position;
 
+        $summaryHtml = $this->renderSummaryBlock($story->summary, $story->sourceName, $story->sourceUrl);
+
         return <<<HTML
             <li class="story-card" data-position="{$position}">
                 <span class="story-number" aria-hidden="true">{$position}</span>
                 <div class="story-body">
                     <h2 class="story-title">{$title}</h2>
                     <p class="story-source">{$source}</p>
+                    {$summaryHtml}
                     <p class="story-excerpt">{$excerpt}</p>
                     <div class="story-actions">
                         <a
@@ -211,6 +247,196 @@ final class BriefController
                 </div>
             </li>
             HTML;
+    }
+
+    /**
+     * Génère le bloc HTML du condensé IA (US-004).
+     *
+     * Cas nominal (isDegraded = false) :
+     * - Badge "BRIEFLY AI:" émeraude avec icône auto_awesome (INV-2)
+     * - Liste <ul> de 3-4 puces échappées via htmlspecialchars (OWASP XSS)
+     * - Lien "Source : [nom]" + bouton "OUVRIR L'ORIGINAL" rel="noopener noreferrer"
+     *
+     * Cas dégradé (isDegraded = true ou $summary = null) :
+     * - Badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" (pas de couleur émeraude)
+     * - Contenu RSS brut échappé (≤ 280 chars)
+     *
+     * Sécurité XSS : TOUT le contenu IA est échappé via htmlspecialchars().
+     * Aucun filtre `raw` — la réponse Mistral/OpenAI est traitée comme non fiable.
+     */
+    private function renderSummaryBlock(?ArticleSummary $summary, string $sourceName, string $sourceUrl): string
+    {
+        if (null === $summary) {
+            // Pas de condensé disponible — aucun bloc affiché
+            return '';
+        }
+
+        $escapedSourceName = htmlspecialchars($sourceName, \ENT_QUOTES | \ENT_HTML5);
+        $escapedSourceUrl = htmlspecialchars($sourceUrl, \ENT_QUOTES | \ENT_HTML5);
+
+        if ($summary->isDegraded) {
+            $degradedContent = htmlspecialchars($summary->degradedContent, \ENT_QUOTES | \ENT_HTML5);
+
+            return <<<HTML
+                <div class="ai-summary ai-summary--degraded" role="region" aria-label="Résumé automatique indisponible">
+                    <div class="ai-summary__badge ai-summary__badge--degraded">
+                        <span class="ai-summary__badge-text">RÉSUMÉ AUTOMATIQUE INDISPONIBLE</span>
+                    </div>
+                    <p class="ai-summary__degraded-content">{$degradedContent}</p>
+                    <p class="ai-summary__source">Source : {$escapedSourceName}</p>
+                    <a
+                        href="{$escapedSourceUrl}"
+                        class="ai-summary__open-link"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                    >OUVRIR L'ORIGINAL</a>
+                </div>
+                HTML;
+        }
+
+        // ── Cas nominal : condensé IA avec badge émeraude (INV-2) ─────────────
+        $bulletsHtml = '';
+
+        foreach ($summary->keyPoints as $bullet) {
+            // XSS : échappement systématique de la réponse LLM (US-004 Conversation §6)
+            $escapedBullet = htmlspecialchars($bullet, \ENT_QUOTES | \ENT_HTML5);
+            $bulletsHtml .= "<li class=\"ai-summary__bullet\">{$escapedBullet}</li>\n";
+        }
+
+        return <<<HTML
+            <div class="ai-summary ai-summary--nominal briefly-ai-badge" role="region" aria-label="Condensé IA Briefly AI">
+                <div class="ai-summary__badge">
+                    <span class="material-symbols-rounded ai-summary__icon" aria-hidden="true">auto_awesome</span>
+                    <span class="ai-summary__badge-text">BRIEFLY AI:</span>
+                </div>
+                <ul class="ai-summary__bullets summary-bullets">
+                    {$bulletsHtml}
+                </ul>
+                <div class="ai-summary__footer">
+                    <p class="ai-summary__source">Source : <span>{$escapedSourceName}</span></p>
+                    <a
+                        href="{$escapedSourceUrl}"
+                        class="ai-summary__open-link"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                    >OUVRIR L'ORIGINAL</a>
+                </div>
+            </div>
+            HTML;
+    }
+
+    /**
+     * CSS du bloc condensé IA (US-004).
+     *
+     * Invariant INV-2 : accent émeraude #10B981 RÉSERVÉ aux éléments IA.
+     * Classe `.briefly-ai-badge` : identifiant de test E2E (T-004-12).
+     * Classe `.summary-bullets` : sélecteur de test E2E (T-004-12).
+     */
+    private function summaryCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            /* ── Condensé IA (US-004) ─────────────────────────────────────────────── */
+            .ai-summary {
+              border-radius: var(--radius);
+              padding: 0.875rem 1rem;
+              margin-bottom: 1rem;
+            }
+            /* Cas nominal : bordure émeraude (INV-2 — réservé à l'IA) */
+            .ai-summary--nominal {
+              background: linear-gradient(135deg, rgba(16,185,129,0.05) 0%, transparent 100%);
+              border: 1px solid var(--color-emerald-accent);
+            }
+            /* Cas dégradé : bordure neutre (pas de couleur émeraude — INV-2) */
+            .ai-summary--degraded {
+              background: var(--color-surface-card);
+              border: 1px dashed var(--color-surface-border);
+            }
+            .ai-summary__badge {
+              display: flex;
+              align-items: center;
+              gap: 0.25rem;
+              margin-bottom: 0.5rem;
+            }
+            .ai-summary__icon {
+              font-size: 14px;
+              color: var(--color-emerald-accent);
+              font-family: 'Material Symbols Rounded';
+              font-style: normal;
+              font-weight: normal;
+            }
+            .ai-summary__badge-text {
+              font-family: var(--font-meta);
+              font-size: 10px;
+              letter-spacing: 0.1em;
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+            /* Badge émeraude uniquement pour le nominal (INV-2) */
+            .ai-summary--nominal .ai-summary__badge-text {
+              color: var(--color-emerald-accent);
+            }
+            /* Badge neutre pour le dégradé */
+            .ai-summary--degraded .ai-summary__badge-text {
+              color: var(--color-outline);
+              letter-spacing: 0.05em;
+            }
+            .ai-summary__bullets {
+              list-style: none;
+              padding: 0;
+              margin: 0 0 0.75rem 0;
+            }
+            .ai-summary__bullet {
+              font-size: 14px;
+              line-height: 1.5;
+              color: var(--color-on-surface-variant);
+              padding: 0.2rem 0 0.2rem 0.625rem;
+              border-left: 2px solid var(--color-emerald-accent);
+              margin-bottom: 0.25rem;
+            }
+            .ai-summary__footer {
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+              flex-wrap: wrap;
+            }
+            .ai-summary__source {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-outline);
+              flex: 1;
+            }
+            .ai-summary__source span { color: var(--color-on-surface-variant); }
+            .ai-summary__open-link {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              font-weight: 700;
+              text-transform: uppercase;
+              color: var(--color-emerald-accent);
+              text-decoration: none;
+              white-space: nowrap;
+            }
+            .ai-summary--degraded .ai-summary__open-link {
+              color: var(--color-slate-gray);
+            }
+            .ai-summary__open-link:hover { text-decoration: underline; }
+            .ai-summary__degraded-content {
+              font-size: var(--fs-body-md);
+              color: var(--color-on-surface-variant);
+              font-style: italic;
+              margin-bottom: 0.5rem;
+            }
+            /* Google Material Symbols (inline font via CDN-free fallback) */
+            @font-face {
+              font-family: 'Material Symbols Rounded';
+              font-style: normal;
+              font-weight: 400;
+              src: url(https://fonts.gstatic.com/s/materialsymbolsrounded/v222/syl0-zNym6-2jv1w84WQhX9R_jn9T5aQ.woff2) format('woff2');
+            }
+            </style>
+            CSS_BLOCK;
     }
 
     /**
@@ -528,7 +754,7 @@ final class BriefController
     /**
      * Design tokens CSS (variables issues de design-tokens.css — INV-7).
      *
-     * Inline Sprint 1 (Twig non disponible, pas d'assets pipeline).
+     * Inline Sprint 1 (Twig non installé).
      * À remplacer par <link href="/build/design-tokens.css"> quand Encore/Vite sera configuré.
      */
     private function designTokensCss(): string
