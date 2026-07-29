@@ -81,6 +81,10 @@ services:
     App\Application\User\PasswordHasherInterface:
         alias: App\Infrastructure\User\Security\SymfonyPasswordHasher
 
+    # ── User (US-031) — OAuth2 ports → Infrastructure adapters ───────────────
+    App\Domain\User\OAuthAccountRepositoryInterface:
+        alias: App\Infrastructure\User\Persistence\DoctrineOAuthAccountRepository
+
     # ── Brief (US-001 + US-002 + US-003) — Domain ports → Infrastructure adapters ─
     App\Domain\Brief\DailyBriefRepositoryInterface:
         alias: App\Infrastructure\Brief\Persistence\DoctrineDailyBriefRepository

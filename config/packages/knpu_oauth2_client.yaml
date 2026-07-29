@@ -1,0 +1,23 @@
+## Briefly AI — KnpU OAuth2 Client Bundle (US-031)
+## Providers : Google + GitHub
+## Secrets via variables d'environnement — JAMAIS en dur (constitution §6)
+## redirect_route : routes définies dans config/routes/oauth.yaml
+
+knpu_oauth2_client:
+    clients:
+        google:
+            type: google
+            # default: permet un fallback vide si la variable n'est pas définie (env de test sans credentials)
+            client_id: '%env(default::GOOGLE_CLIENT_ID)%'
+            client_secret: '%env(default::GOOGLE_CLIENT_SECRET)%'
+            redirect_route: app_oauth_callback
+            redirect_params: { service: google }
+            # user_fields : email + profil (pas de token offline — exigence RGPD)
+            user_fields: []
+
+        github:
+            type: github
+            client_id: '%env(default::GITHUB_CLIENT_ID)%'
+            client_secret: '%env(default::GITHUB_CLIENT_SECRET)%'
+            redirect_route: app_oauth_callback
+            redirect_params: { service: github }

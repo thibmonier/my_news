@@ -43,6 +43,7 @@ security:
         # Firewall principal — form_login pour le desktop (ADR-001, ADR-005)
         # Session HttpOnly + SameSite=Strict (framework.yaml)
         # entry_point personnalisé : JSON 401 pour /api/* (OWASP A05), redirect /login pour le web.
+        # US-031 : custom_authenticators OAuth2 (Google + GitHub) en plus de form_login.
         main:
             lazy: true
             provider: app_users
@@ -54,6 +55,10 @@ security:
                 username_parameter: email
                 password_parameter: password
                 enable_csrf: true
+            # US-031 : Authenticators OAuth2 — state CSRF géré par KnpU OAuth2Client
+            custom_authenticators:
+                - App\Infrastructure\User\Security\GoogleAuthenticator
+                - App\Infrastructure\User\Security\GithubAuthenticator
             logout:
                 path: /logout
                 target: /
@@ -63,6 +68,8 @@ security:
         # US-001 : routes publiques (IS_AUTHENTICATED_ANONYMOUSLY)
         - { path: ^/brief, roles: PUBLIC_ACCESS }
         - { path: ^/$, roles: PUBLIC_ACCESS }
+        # US-031 : routes OAuth publiques (initiation + callback)
+        - { path: ^/oauth/, roles: PUBLIC_ACCESS }
         # Routes authentifiées
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/dashboard, roles: ROLE_USER }

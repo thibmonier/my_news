@@ -13,6 +13,13 @@ framework:
             interval: '1 hour'
             lock_factory: lock.default.factory
 
+        # US-031 : OAuth callbacks — 10 req/5min/IP (protection brute force)
+        oauth_callback_by_ip:
+            policy: sliding_window
+            limit: 10
+            interval: '5 minutes'
+            lock_factory: lock.default.factory
+
 when@test:
     framework:
         rate_limiter:
@@ -21,4 +28,10 @@ when@test:
                 policy: sliding_window
                 limit: 1000
                 interval: '1 hour'
+                cache_pool: cache.system
+
+            oauth_callback_by_ip:
+                policy: sliding_window
+                limit: 1000
+                interval: '5 minutes'
                 cache_pool: cache.system

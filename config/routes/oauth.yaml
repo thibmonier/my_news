@@ -1,0 +1,17 @@
+## Briefly AI — Routes OAuth2 (US-031)
+## /oauth/connect/{service} : initie la redirection vers le provider
+## /oauth/callback/{service} : callback après autorisation
+
+app_oauth_connect:
+    path: /oauth/connect/{service}
+    controller: App\Presentation\Controller\OAuthController::connect
+    methods: [GET]
+    requirements:
+        service: 'google|github'
+
+app_oauth_callback:
+    path: /oauth/callback/{service}
+    controller: App\Presentation\Controller\OAuthController::callback
+    methods: [GET]
+    requirements:
+        service: 'google|github'
