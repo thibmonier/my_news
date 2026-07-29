@@ -17,9 +17,9 @@ framework:
                     consumer: '%env(default:hostname:HOSTNAME)%'
                 retry_strategy:
                     max_retries: 3
-                    delay: 1000        # 1s
-                    multiplier: 2      # backoff exponentiel (tech-spec §11.5)
-                    max_delay: 60000   # 60s max
+                    delay: 300000      # 5 min (US-003 spec : backoff 5 min, 10 min, 20 min)
+                    multiplier: 2      # backoff exponentiel : 5min → 10min → 20min
+                    max_delay: 1200000 # 20 min max (tech-spec §11.5)
 
             # Dead Letter Queue
             failed:
@@ -29,4 +29,8 @@ framework:
                     group: symfony_failed
 
         # Routing : mappé par namespace de message (à compléter au fil des sprints)
-        routing: {}
+        routing:
+            # US-020 : ingestion RSS — un message par source active, traitement parallèle
+            App\Application\Feed\FetchSource\FetchSourceMessage: async
+            # US-002 : génération du Daily Brief — un message par date
+            App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefMessage: async

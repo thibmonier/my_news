@@ -16,7 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 uses(WebTestCase::class);
 
-test('GET /api/health répond avec une structure JSON valide', static function (): void {
+test('GET /api/health répond avec une structure JSON valide', function (): void {
     $client = static::createClient();
     $client->request('GET', '/api/health');
 
@@ -35,7 +35,7 @@ test('GET /api/health répond avec une structure JSON valide', static function (
         ->and($data['components'])->toBeArray();
 });
 
-test('GET /api/health répond avec les bonnes clés pour chaque composant', static function (): void {
+test('GET /api/health répond avec les bonnes clés pour chaque composant', function (): void {
     $client = static::createClient();
     $client->request('GET', '/api/health');
 
@@ -49,7 +49,7 @@ test('GET /api/health répond avec les bonnes clés pour chaque composant', stat
     }
 });
 
-test('GET /api/health timestamp est au format ISO 8601', static function (): void {
+test('GET /api/health timestamp est au format ISO 8601', function (): void {
     $client = static::createClient();
     $client->request('GET', '/api/health');
 
@@ -60,7 +60,7 @@ test('GET /api/health timestamp est au format ISO 8601', static function (): voi
     expect($dt)->not->toBeFalse();
 });
 
-test('GET /api/health Content-Type est application/json', static function (): void {
+test('GET /api/health Content-Type est application/json', function (): void {
     $client = static::createClient();
     $client->request('GET', '/api/health');
 

@@ -34,3 +34,118 @@ services:
         arguments:
             - '%env(REDIS_URL)%'
         public: false
+
+    # ── FeedIo RSS/Atom fetcher (US-020) ──────────────────────────────────────
+    # HTTP client Symfony avec User-Agent "BrieflyAI/1.0" pour la politique robots.txt.
+    # Le Psr18Client enveloppe le NativeHttpClient dans le contrat PSR-18.
+    # FeedIo\Adapter\Http\Client utilise PSR-18 pour les requêtes GET.
+    brieflyai.feed_http_client:
+        class: Symfony\Component\HttpClient\NativeHttpClient
+        arguments:
+            $defaultOptions:
+                headers:
+                    User-Agent: 'BrieflyAI/1.0'
+        public: false
+
+    brieflyai.psr18_client:
+        class: Symfony\Component\HttpClient\Psr18Client
+        arguments:
+            $client: '@brieflyai.feed_http_client'
+        public: false
+
+    FeedIo\Adapter\Http\Client:
+        arguments:
+            $client: '@brieflyai.psr18_client'
+        public: false
+
+    FeedIo\FeedIo:
+        arguments:
+            $client: '@FeedIo\Adapter\Http\Client'
+            $logger: '@logger'
+        public: false
+
+    # ── Feed repositories (Domain ports → Infrastructure adapters) ─────────────
+    App\Domain\Feed\SourceRepositoryInterface:
+        alias: App\Infrastructure\Feed\Persistence\DoctrineSourceRepository
+
+    App\Domain\Feed\ArticleRepositoryInterface:
+        alias: App\Infrastructure\Feed\Persistence\DoctrineArticleRepository
+
+    App\Domain\Feed\SourceFetcherInterface:
+        alias: App\Infrastructure\Feed\Fetcher\FeedIoSourceFetcher
+
+    # ── User (US-030) — Domain ports → Infrastructure adapters ────────────────
+    App\Domain\User\UserRepositoryInterface:
+        alias: App\Infrastructure\User\Persistence\DoctrineUserRepository
+
+    App\Application\User\PasswordHasherInterface:
+        alias: App\Infrastructure\User\Security\SymfonyPasswordHasher
+
+    # ── Brief (US-001 + US-002 + US-003) — Domain ports → Infrastructure adapters ─
+    App\Domain\Brief\DailyBriefRepositoryInterface:
+        alias: App\Infrastructure\Brief\Persistence\DoctrineDailyBriefRepository
+
+    App\Domain\Brief\ArticleCandidateRepositoryInterface:
+        alias: App\Infrastructure\Brief\Persistence\DoctrineArticleCandidateRepository
+
+    # US-001 : Vue publique enrichie (JOIN brief_stories + articles + sources)
+    # Port ISP dédié à la lecture en présentation (séparé de DailyBriefRepositoryInterface)
+    App\Domain\Brief\BriefPublicViewRepositoryInterface:
+        alias: App\Infrastructure\Brief\Persistence\DoctrineBriefPublicViewRepository
+
+    # BriefSelectorService est en Domain (logique pure) mais requiert le DI
+    # car ses dépendances sont des interfaces Domain (ports secondaires).
+    # Le Domain est exclu de l'auto-discovery — définition manuelle requise (DIP).
+    App\Domain\Brief\BriefSelectorServiceInterface:
+        alias: App\Domain\Brief\BriefSelectorService
+
+    App\Domain\Brief\BriefSelectorService:
+        arguments:
+            $articleCandidateRepository: '@App\Domain\Brief\ArticleCandidateRepositoryInterface'
+            $dailyBriefRepository: '@App\Domain\Brief\DailyBriefRepositoryInterface'
+            $logger: '@logger'
+
+    # ── US-003 : Logging structuré JSON pour le batch Daily Brief ────────────
+    # Les events brief.batch_start/success/failed/lock_* sont loggués via @logger (PSR-3).
+    # T-003-04 : structure JSON dans le contexte — canal dédié (MonologBundle) à activer
+    # quand symfony/monolog-bundle sera ajouté (backlog infrastructure US-INF-001).
+    # Pour l'instant : autowiring par défaut → @logger (Symfony\Component\HttpKernel\Log\Logger).
+
+    # ── Quota (US-033) — Domain port → Infrastructure adapter ────────────────
+    # RGPD : clé Redis = UUID uniquement (non réversible vers email/IP).
+    # Fail-safe : Redis KO → QuotaServiceUnavailableException → HTTP 503.
+    App\Domain\Quota\QuotaCounterInterface:
+        alias: App\Infrastructure\Quota\RedisQuotaCounter
+
+    # Port UserUuidResolverInterface (Application) → SecurityUserUuidResolver (Infrastructure).
+    # Découple QuotaStateProcessor et QuotaController de Symfony Security (deptrac + testabilité).
+    App\Application\Quota\UserUuidResolverInterface:
+        alias: App\Infrastructure\User\SecurityUserUuidResolver
+
+    # ── QuotaStateProcessor (US-033) — décorateur du processor de synthèse ───
+    # Pattern décorateur : QuotaStateProcessor (outer) → SynthesisStubProcessor (inner).
+    # Sprint 1 : SynthesisStubProcessor est le placeholder d'US-010 (Mistral).
+    App\Presentation\StateProcessor\QuotaStateProcessor:
+        arguments:
+            $innerProcessor: '@App\Presentation\StateProcessor\SynthesisStubProcessor'
+
+    # ── US-010 : Synthèse IA réelle via Mistral ──────────────────────────────
+
+    # Domain ports → Infrastructure adapters (Synthesis bounded context)
+    App\Domain\Synthesis\SynthesisServiceInterface:
+        alias: App\Application\Synthesis\SynthesisService
+
+    App\Domain\Synthesis\MistralClientInterface:
+        alias: App\Infrastructure\Synthesis\Ai\MistralApiClient
+
+    App\Domain\Synthesis\ArticleContentFetcherInterface:
+        alias: App\Infrastructure\Synthesis\Http\HttpArticleContentFetcher
+
+    App\Domain\Synthesis\SynthesisResultRepositoryInterface:
+        alias: App\Infrastructure\Synthesis\Persistence\DoctrineSynthesisResultRepository
+
+    # MistralApiClient : injection de la clé API (env MISTRAL_API_KEY)
+    # Utilise le client HTTP par défaut (autowire HttpClientInterface)
+    App\Infrastructure\Synthesis\Ai\MistralApiClient:
+        arguments:
+            $apiKey: '%env(MISTRAL_API_KEY)%'

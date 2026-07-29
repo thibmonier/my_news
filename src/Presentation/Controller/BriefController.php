@@ -1,0 +1,726 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Presentation\Controller;
+
+use App\Domain\Brief\BriefPublicViewRepositoryInterface;
+use App\Presentation\ViewModel\DailyBriefViewModel;
+use App\Presentation\ViewModel\StoryViewModel;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+/**
+ * Contrôleur — Page web publique du Daily Brief (US-001).
+ *
+ * Routes :
+ *   GET /brief → 200 (page brief ou empty state)
+ *   GET /      → 301 /brief (SEO — US-001 conversation §1)
+ *
+ * Accès : PUBLIC (IS_AUTHENTICATED_ANONYMOUSLY — pas de firewall sur ces routes).
+ * Pas de CSRF sur GET (constitution §6, US-001 critère sécurité).
+ *
+ * Gestion des états :
+ * - Brief disponible    → 200 + HTML avec 3 histoires numérotées 01/02/03
+ * - Table vide          → 200 + message "Brief en cours de préparation"
+ * - Erreur base données → 503 + message générique + header Retry-After: 60
+ *
+ * SÉCURITÉ OWASP #7 (Mishandling Exceptional Conditions) :
+ * - Jamais de stacktrace dans la réponse HTML
+ * - Messages d'erreur génériques côté client
+ * - Logging côté serveur sans données personnelles
+ *
+ * Note Sprint 1 : HTML inline (Twig non installé).
+ * À migrer vers templates/brief/index.html.twig en Sprint 2.
+ *
+ * Couche Presentation — dépend de Domain + Application.
+ * Deptrac : Presentation:[Domain, Application].
+ */
+final class BriefController
+{
+    public function __construct(
+        private readonly BriefPublicViewRepositoryInterface $briefRepository,
+        private readonly LoggerInterface $logger,
+    ) {
+    }
+
+    /**
+     * Page publique du Daily Brief.
+     */
+    #[Route('/brief', name: 'app_brief', methods: ['GET'])]
+    public function index(): Response
+    {
+        try {
+            $publicView = $this->briefRepository->findLatestPublicView();
+        } catch (\Throwable $e) {
+            // Erreur technique (DB timeout, crash PostgreSQL, etc.)
+            // OWASP #7 : log avec contexte technique, réponse générique sans détail
+            $this->logger->error('brief.db_error', [
+                'event' => 'brief.db_error',
+                'error_class' => $e::class,
+                'error' => $e->getMessage(),
+                // Pas de stack trace complète en prod (OWASP #7)
+            ]);
+
+            return $this->serviceUnavailableResponse();
+        }
+
+        if (null === $publicView) {
+            // Table vide — premier démarrage ou aucun brief en état 'ready'
+            $this->logger->info('no_daily_brief_available', [
+                'event' => 'no_daily_brief_available',
+                // Pas de données personnelles dans les logs (RGPD + INV-6)
+            ]);
+
+            return $this->emptyStateResponse();
+        }
+
+        $viewModel = DailyBriefViewModel::fromPublicView($publicView);
+
+        return new Response(
+            $this->renderBriefHtml($viewModel),
+            Response::HTTP_OK,
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
+    }
+
+    /**
+     * Page d'accueil — redirect SEO 301 vers /brief (US-001 conversation §1).
+     */
+    #[Route('/', name: 'app_home', methods: ['GET'])]
+    public function home(): RedirectResponse
+    {
+        return new RedirectResponse('/brief', Response::HTTP_MOVED_PERMANENTLY);
+    }
+
+    // ── HTML rendering ─────────────────────────────────────────────────────────
+
+    /**
+     * Génère le HTML principal du brief avec les 3 histoires.
+     *
+     * Utilise les design tokens CSS (design-tokens.css) inlinés pour Sprint 1.
+     * SEO : title, meta description, og:title, og:description, og:url (US-001/T-001-05).
+     * Turbo Drive : data-turbo="true" + import Hotwire (US-001 scénario alternatif 2).
+     * Liens OUVRIR L'ORIGINAL : rel="noopener noreferrer" (US-001 conversation §6).
+     * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement à l'IA — pas utilisé ici.
+     */
+    private function renderBriefHtml(DailyBriefViewModel $vm): string
+    {
+        $storiesHtml = '';
+
+        foreach ($vm->stories as $story) {
+            $storiesHtml .= $this->renderStory($story);
+        }
+
+        $pageTitle = htmlspecialchars('DAILY BRIEF — Briefly AI', \ENT_QUOTES | \ENT_HTML5);
+        $metaDescription = "Votre synth\u{00E8}se quotidienne des 3 histoires majeures de l'actualit\u{00E9} tech.";
+        $ogUrl = 'https://briefly.ai/brief'; // @TODO: injecter depuis env en Sprint 2
+        $lastUpdated = htmlspecialchars($vm->lastUpdatedFormatted, \ENT_QUOTES | \ENT_HTML5);
+
+        return <<<HTML
+            <!DOCTYPE html>
+            <html lang="fr" data-turbo="true">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>{$pageTitle}</title>
+                <meta name="description" content="{$metaDescription}">
+                <meta property="og:title" content="DAILY BRIEF — Briefly AI">
+                <meta property="og:description" content="{$metaDescription}">
+                <meta property="og:url" content="{$ogUrl}">
+                <meta property="og:type" content="website">
+                {$this->designTokensCss()}
+                {$this->pageCss()}
+                {$this->synthesisCss()}
+            </head>
+            <body>
+                <header class="site-header" role="banner">
+                    <nav class="nav-container" aria-label="Navigation principale">
+                        <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
+                    </nav>
+                </header>
+
+                <main class="main-content" id="main-content">
+                    <div class="brief-container">
+                        <div class="brief-header">
+                            <h1 class="brief-title">DAILY BRIEF</h1>
+                            <p class="brief-timestamp">
+                                <time>LAST UPDATED {$lastUpdated}</time>
+                            </p>
+                        </div>
+
+                        <ol class="stories-list" aria-label="Les 3 histoires du jour">
+                            {$storiesHtml}
+                        </ol>
+                    </div>
+                </main>
+
+                <footer class="site-footer" role="contentinfo">
+                    <p>© Briefly AI — fort signal, faible bruit, ton éditorial.</p>
+                </footer>
+
+                {$this->synthesisJs()}
+            </body>
+            </html>
+            HTML;
+    }
+
+    /**
+     * Génère le HTML d'une story individuelle.
+     *
+     * Le lien "OUVRIR L'ORIGINAL" utilise rel="noopener noreferrer" (US-001/T-001-05).
+     * Bouton "GENERATE AI SUMMARY" déclenche un appel JS vers POST /api/v1/synthesis (US-010).
+     * Invariant INV-2 : accent émeraude (#10B981) réservé au bloc synthèse IA "BRIEFLY AI:".
+     */
+    private function renderStory(StoryViewModel $story): string
+    {
+        $position = htmlspecialchars($story->position, \ENT_QUOTES | \ENT_HTML5);
+        $title = htmlspecialchars($story->title, \ENT_QUOTES | \ENT_HTML5);
+        $source = htmlspecialchars($story->sourceName, \ENT_QUOTES | \ENT_HTML5);
+        $excerpt = htmlspecialchars($story->excerpt, \ENT_QUOTES | \ENT_HTML5);
+        $sourceUrl = htmlspecialchars($story->sourceUrl, \ENT_QUOTES | \ENT_HTML5);
+        // Identifiant unique de la zone de synthèse (position 01/02/03)
+        $zoneId = 'synthesis-result-' . $story->position;
+
+        return <<<HTML
+            <li class="story-card" data-position="{$position}">
+                <span class="story-number" aria-hidden="true">{$position}</span>
+                <div class="story-body">
+                    <h2 class="story-title">{$title}</h2>
+                    <p class="story-source">{$source}</p>
+                    <p class="story-excerpt">{$excerpt}</p>
+                    <div class="story-actions">
+                        <a
+                            href="{$sourceUrl}"
+                            class="story-link"
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            aria-label="Ouvrir l'article original : {$title}"
+                        >OUVRIR L'ORIGINAL →</a>
+                        <button
+                            class="synthesis-btn"
+                            data-url="{$sourceUrl}"
+                            data-zone="{$zoneId}"
+                            onclick="handleSynthesis(this)"
+                            aria-label="Générer une synthèse IA pour : {$title}"
+                        >GENERATE AI SUMMARY</button>
+                    </div>
+                    <div id="{$zoneId}" class="synthesis-zone" role="region" aria-live="polite" aria-label="Synthèse IA de l'article"></div>
+                </div>
+            </li>
+            HTML;
+    }
+
+    /**
+     * Script JS inline pour la synthèse IA (US-010).
+     *
+     * Pas de bundler en Sprint 1 — JS vanilla inline.
+     * Action : POST /api/v1/synthesis avec l'URL de l'article.
+     * - Affiche un skeleton loading pendant l'appel (max 10s timeout côté JS)
+     * - Met à jour le Turbo Frame (zone synthesis-result-{pos}) avec le résultat
+     * - Gère les erreurs : 401 → invitation à se connecter, 422 → URL invalide,
+     *   429 → quota dépassé, 503 → service indisponible
+     * - Aucun PII envoyé (juste l'URL de l'article — public)
+     */
+    private function synthesisJs(): string
+    {
+        return <<<'JS_BLOCK'
+            <script>
+            async function handleSynthesis(btn) {
+              const url  = btn.dataset.url;
+              const zone = document.getElementById(btn.dataset.zone);
+              if (!url || !zone) return;
+
+              // Skeleton loading
+              btn.disabled = true;
+              btn.textContent = 'GENERATING…';
+              zone.innerHTML = '<div class="synthesis-skeleton" aria-busy="true">Génération en cours…</div>';
+
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 10000); // 10s JS timeout
+
+              try {
+                const resp = await fetch('/api/v1/synthesis', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                  body: JSON.stringify({ url }),
+                  signal: controller.signal,
+                });
+                clearTimeout(timeout);
+
+                if (resp.status === 401 || resp.status === 403) {
+                  zone.innerHTML = '<div class="synthesis-error">Connectez-vous pour générer une synthèse IA. <a href="/login">Se connecter →</a></div>';
+                  btn.textContent = 'GENERATE AI SUMMARY';
+                  btn.disabled = false;
+                  return;
+                }
+
+                if (resp.status === 429) {
+                  zone.innerHTML = '<div class="synthesis-error">Quota épuisé — 3 synthèses gratuites utilisées aujourd\'hui.</div>';
+                  btn.textContent = 'GENERATE AI SUMMARY';
+                  btn.disabled = false;
+                  return;
+                }
+
+                if (resp.status === 422) {
+                  zone.innerHTML = '<div class="synthesis-error">URL invalide — vérifiez le format de l\'adresse.</div>';
+                  btn.textContent = 'GENERATE AI SUMMARY';
+                  btn.disabled = false;
+                  return;
+                }
+
+                if (!resp.ok) {
+                  zone.innerHTML = '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
+                  btn.textContent = 'GENERATE AI SUMMARY';
+                  btn.disabled = false;
+                  return;
+                }
+
+                const data = await resp.json();
+                zone.innerHTML = renderSynthesis(data);
+                btn.textContent = '✓ SYNTHÈSE GÉNÉRÉE';
+              } catch (e) {
+                clearTimeout(timeout);
+                const isTimeout = e.name === 'AbortError';
+                zone.innerHTML = isTimeout
+                  ? '<div class="synthesis-error">Délai dépassé (10s) — réessayez dans quelques instants.</div>'
+                  : '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
+                btn.textContent = 'GENERATE AI SUMMARY';
+                btn.disabled = false;
+              }
+            }
+
+            function renderSynthesis(data) {
+              const keyPointsHtml = (data.keyPoints || [])
+                .map(kp => `<li class="synthesis-kp">${escHtml(kp)}</li>`)
+                .join('');
+              const sourcesHtml = (data.sources || [])
+                .map(s => escHtml(s))
+                .join(', ');
+              const partialBanner = data.isPartial
+                ? '<p class="synthesis-partial">Contenu partiel — accès limité à la source</p>'
+                : '';
+              const originalUrl = data.originalUrl || '';
+              const content = data.content || '';
+
+              return `<div class="synthesis-result">
+                <div class="synthesis-badge">BRIEFLY AI</div>
+                <p class="synthesis-content">${escHtml(content)}</p>
+                ${keyPointsHtml ? `<ol class="synthesis-keypoints">${keyPointsHtml}</ol>` : ''}
+                ${sourcesHtml ? `<p class="synthesis-sources">Sources : ${sourcesHtml}</p>` : ''}
+                ${partialBanner}
+                ${originalUrl ? `<a href="${escHtml(originalUrl)}" class="synthesis-original-link" rel="noopener noreferrer" target="_blank">OUVRIR L'ORIGINAL →</a>` : ''}
+              </div>`;
+            }
+
+            function escHtml(str) {
+              return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+            }
+            </script>
+            JS_BLOCK;
+    }
+
+    /**
+     * CSS additionnel pour la zone de synthèse IA (US-010).
+     *
+     * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement au bloc "BRIEFLY AI:".
+     */
+    private function synthesisCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            .story-actions {
+              display: flex;
+              gap: 0.5rem;
+              align-items: center;
+              flex-wrap: wrap;
+              margin-bottom: 0.75rem;
+            }
+            .synthesis-btn {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-emerald-accent);
+              background: transparent;
+              border: 1px solid var(--color-emerald-accent);
+              padding: 0.375rem 0.75rem;
+              border-radius: var(--radius);
+              cursor: pointer;
+              font-weight: 600;
+              text-transform: uppercase;
+              transition: background 0.15s ease, color 0.15s ease;
+            }
+            .synthesis-btn:hover:not(:disabled) {
+              background: var(--color-emerald-accent);
+              color: #fff;
+            }
+            .synthesis-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+            .synthesis-zone { margin-top: 0.75rem; }
+            .synthesis-skeleton {
+              background: var(--color-surface-border);
+              border-radius: var(--radius);
+              padding: 1rem;
+              color: var(--color-on-surface-variant);
+              font-style: italic;
+              animation: pulse 1.5s ease-in-out infinite;
+            }
+            @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+            .synthesis-result {
+              background: linear-gradient(135deg, rgba(16,185,129,0.04) 0%, transparent 100%);
+              border: 1px solid var(--color-emerald-accent);
+              border-radius: var(--radius);
+              padding: 1rem 1.25rem;
+            }
+            .synthesis-badge {
+              font-family: var(--font-meta);
+              font-size: 10px;
+              letter-spacing: 0.1em;
+              font-weight: 700;
+              color: var(--color-emerald-accent);
+              text-transform: uppercase;
+              margin-bottom: 0.5rem;
+            }
+            .synthesis-content {
+              font-size: var(--fs-body-md);
+              line-height: var(--lh-body-md);
+              color: var(--color-on-surface);
+              margin-bottom: 0.75rem;
+            }
+            .synthesis-keypoints {
+              list-style: none;
+              padding: 0;
+              margin-bottom: 0.75rem;
+            }
+            .synthesis-kp {
+              font-size: 14px;
+              line-height: 1.5;
+              color: var(--color-on-surface-variant);
+              padding: 0.25rem 0;
+              border-left: 2px solid var(--color-emerald-accent);
+              padding-left: 0.5rem;
+              margin-bottom: 0.25rem;
+            }
+            .synthesis-sources {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-outline);
+              margin-bottom: 0.5rem;
+            }
+            .synthesis-partial {
+              font-size: var(--fs-label);
+              color: #f59e0b;
+              margin-bottom: 0.5rem;
+            }
+            .synthesis-original-link {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-emerald-accent);
+              text-decoration: none;
+              font-weight: 600;
+              text-transform: uppercase;
+            }
+            .synthesis-original-link:hover { text-decoration: underline; }
+            .synthesis-error {
+              background: #fee2e2;
+              color: #dc2626;
+              border-radius: var(--radius);
+              padding: 0.75rem;
+              font-size: 14px;
+            }
+            .synthesis-error a { color: #dc2626; font-weight: 600; }
+            </style>
+            CSS_BLOCK;
+    }
+
+    /**
+     * Réponse 200 "empty state" : table vide ou aucun brief ready (US-001 scénario erreur 1).
+     */
+    private function emptyStateResponse(): Response
+    {
+        $html = <<<HTML
+            <!DOCTYPE html>
+            <html lang="fr">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>DAILY BRIEF — Briefly AI</title>
+                {$this->designTokensCss()}
+                {$this->pageCss()}
+            </head>
+            <body>
+                <header class="site-header" role="banner">
+                    <nav class="nav-container" aria-label="Navigation principale">
+                        <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
+                    </nav>
+                </header>
+                <main class="main-content" id="main-content">
+                    <div class="brief-container">
+                        <div class="brief-header">
+                            <h1 class="brief-title">DAILY BRIEF</h1>
+                        </div>
+                        <div class="empty-state" role="status" aria-live="polite">
+                            <p>Brief en cours de préparation — revenez dans quelques instants.</p>
+                        </div>
+                    </div>
+                </main>
+            </body>
+            </html>
+            HTML;
+
+        return new Response($html, Response::HTTP_OK, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    /**
+     * Réponse 503 générique sans stacktrace (US-001 scénario erreur 2 + OWASP #7).
+     *
+     * Header Retry-After: 60 indique au client de réessayer dans 60 secondes.
+     */
+    private function serviceUnavailableResponse(): Response
+    {
+        $html = <<<HTML
+            <!DOCTYPE html>
+            <html lang="fr">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Service indisponible — Briefly AI</title>
+                {$this->designTokensCss()}
+                {$this->pageCss()}
+            </head>
+            <body>
+                <header class="site-header" role="banner">
+                    <nav class="nav-container">
+                        <a href="/brief" class="logo">BRIEFLY</a>
+                    </nav>
+                </header>
+                <main class="main-content" id="main-content">
+                    <div class="brief-container">
+                        <div class="error-state" role="alert">
+                            <h1>Service temporairement indisponible</h1>
+                            <p>Nous rencontrons des difficultés techniques. Veuillez réessayer dans quelques instants.</p>
+                            <a href="/brief">Actualiser la page</a>
+                        </div>
+                    </div>
+                </main>
+            </body>
+            </html>
+            HTML;
+
+        return new Response(
+            $html,
+            Response::HTTP_SERVICE_UNAVAILABLE,
+            [
+                'Content-Type' => 'text/html; charset=UTF-8',
+                'Retry-After' => '60',
+            ],
+        );
+    }
+
+    /**
+     * Design tokens CSS (variables issues de design-tokens.css — INV-7).
+     *
+     * Inline Sprint 1 (Twig non disponible, pas d'assets pipeline).
+     * À remplacer par <link href="/build/design-tokens.css"> quand Encore/Vite sera configuré.
+     */
+    private function designTokensCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            :root {
+              --color-emerald-accent: #10B981;
+              --color-deep-indigo: #1E1B4B;
+              --color-slate-gray: #64748B;
+              --color-primary: #091426;
+              --color-on-primary: #FFFFFF;
+              --color-primary-container: #1E293B;
+              --color-surface: #F7F9FB;
+              --color-surface-card: #FFFFFF;
+              --color-surface-border: #E2E8F0;
+              --color-on-surface: #191C1E;
+              --color-on-surface-variant: #45474C;
+              --color-outline: #75777D;
+              --font-headline: "Source Serif 4", Georgia, "Times New Roman", serif;
+              --font-body: "Inter", system-ui, -apple-system, sans-serif;
+              --font-meta: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+              --fs-headline-xl: 40px; --lh-headline-xl: 48px; --ls-headline: -0.02em;
+              --fs-headline-xl-mobile: 30px; --lh-headline-xl-mobile: 36px;
+              --fs-body-md: 16px; --lh-body-md: 24px;
+              --fs-label: 12px; --lh-label: 16px; --ls-label: 0.05em;
+              --radius: 0.25rem;
+              --space-stack-sm: 0.5rem; --space-stack-md: 1.5rem; --space-stack-lg: 3rem;
+              --space-gutter: 1.5rem;
+              --read-max: 768px; --browse-max: 1120px;
+            }
+            @media (prefers-color-scheme: dark) {
+              :root:not([data-theme="light"]) {
+                --color-primary: #4EDEA3;
+                --color-surface: #051424;
+                --color-surface-card: #122131;
+                --color-surface-border: #273647;
+                --color-on-surface: #D4E4FA;
+                --color-on-surface-variant: #BBCABF;
+              }
+            }
+            </style>
+            CSS_BLOCK;
+    }
+
+    /**
+     * CSS spécifique à la page brief.
+     *
+     * Responsive : 1 colonne mobile (< 768px), layout adaptatif desktop.
+     * Invariant INV-2 : accent émeraude NON utilisé sur les cartes (réservé à l'IA).
+     */
+    private function pageCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              font-family: var(--font-body);
+              background-color: var(--color-surface);
+              color: var(--color-on-surface);
+              line-height: var(--lh-body-md);
+              min-height: 100vh;
+            }
+            .site-header {
+              background-color: var(--color-primary-container);
+              padding: 1rem var(--space-gutter);
+              border-bottom: 1px solid var(--color-surface-border);
+            }
+            .nav-container {
+              max-width: var(--browse-max);
+              margin: 0 auto;
+              display: flex;
+              align-items: center;
+            }
+            .logo {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-on-primary);
+              text-decoration: none;
+              font-weight: 700;
+            }
+            .main-content {
+              max-width: var(--browse-max);
+              margin: 0 auto;
+              padding: var(--space-stack-lg) var(--space-gutter);
+            }
+            .brief-container { max-width: var(--read-max); }
+            .brief-header { margin-bottom: var(--space-stack-lg); }
+            .brief-title {
+              font-family: var(--font-meta);
+              font-size: var(--fs-headline-xl);
+              line-height: var(--lh-headline-xl);
+              letter-spacing: var(--ls-headline);
+              color: var(--color-on-surface);
+              font-weight: 700;
+            }
+            @media (max-width: 767px) {
+              .brief-title {
+                font-size: var(--fs-headline-xl-mobile);
+                line-height: var(--lh-headline-xl-mobile);
+              }
+            }
+            .brief-timestamp {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-on-surface-variant);
+              margin-top: var(--space-stack-sm);
+              text-transform: uppercase;
+            }
+            .stories-list { list-style: none; display: flex; flex-direction: column; gap: var(--space-stack-md); }
+            .story-card {
+              background-color: var(--color-surface-card);
+              border: 1px solid var(--color-surface-border);
+              border-radius: var(--radius);
+              padding: var(--space-stack-md);
+              display: flex;
+              gap: 1rem;
+              position: relative;
+            }
+            .story-number {
+              font-family: var(--font-meta);
+              font-size: var(--fs-headline-xl);
+              font-weight: 700;
+              color: var(--color-surface-border);
+              line-height: 1;
+              flex-shrink: 0;
+              min-width: 3rem;
+            }
+            .story-body { flex: 1; min-width: 0; }
+            .story-title {
+              font-family: var(--font-headline);
+              font-size: 20px;
+              font-weight: 600;
+              color: var(--color-on-surface);
+              margin-bottom: var(--space-stack-sm);
+              line-height: 1.3;
+            }
+            .story-source {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-outline);
+              text-transform: uppercase;
+              margin-bottom: var(--space-stack-sm);
+            }
+            .story-excerpt {
+              font-size: var(--fs-body-md);
+              line-height: var(--lh-body-md);
+              color: var(--color-on-surface-variant);
+              margin-bottom: 1rem;
+            }
+            .story-link {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-slate-gray);
+              text-decoration: none;
+              font-weight: 600;
+              text-transform: uppercase;
+              border: 1px solid var(--color-surface-border);
+              padding: 0.375rem 0.75rem;
+              border-radius: var(--radius);
+              display: inline-block;
+              transition: border-color 0.15s ease;
+            }
+            .story-link:hover { border-color: var(--color-outline); color: var(--color-on-surface); }
+            .empty-state, .error-state {
+              background-color: var(--color-surface-card);
+              border: 1px solid var(--color-surface-border);
+              border-radius: var(--radius);
+              padding: var(--space-stack-lg);
+              text-align: center;
+            }
+            .error-state h1 { margin-bottom: var(--space-stack-md); font-size: 24px; }
+            .error-state a {
+              color: var(--color-slate-gray);
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              text-transform: uppercase;
+            }
+            .site-footer {
+              padding: var(--space-stack-md) var(--space-gutter);
+              text-align: center;
+              font-size: var(--fs-label);
+              color: var(--color-on-surface-variant);
+              border-top: 1px solid var(--color-surface-border);
+              margin-top: var(--space-stack-lg);
+            }
+            </style>
+            CSS_BLOCK;
+    }
+}

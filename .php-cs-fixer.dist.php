@@ -41,6 +41,8 @@ return (new PhpCsFixer\Config())
         'trailing_comma_in_multiline' => ['elements' => ['arrays', 'arguments', 'parameters']],
         // Sécurité (constitution §4)
         'native_function_invocation' => ['include' => ['@compiler_optimized'], 'scope' => 'namespaced'],
+        // Pest 3 incompatibility: static closures break Pest's $this binding in test callbacks
+        'static_lambda' => false,
     ])
     ->setFinder($finder)
     ->setRiskyAllowed(true)

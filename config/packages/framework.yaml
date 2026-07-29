@@ -32,3 +32,13 @@ framework:
 
     # Assets (si actif)
     assets: ~
+
+    # Symfony Scheduler — actif pour FetchAllSourcesTask (#[AsPeriodicTask] every 15 min)
+    # Worker : `bin/console messenger:consume scheduler_default`
+    scheduler:
+        enabled: true
+
+    # Symfony Lock — anti-doublon Redis pour GenerateDailyBriefHandler (US-003/T-003-02)
+    # LOCK_DSN : redis://redis:6379 (env.example)
+    # Crée le service lock.default.factory (LockFactory autowirable)
+    lock: '%env(LOCK_DSN)%'

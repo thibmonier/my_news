@@ -1,0 +1,24 @@
+## Briefly AI — Rate Limiter (Symfony Rate Limiter + Redis)
+## US-030 : protection anti-spam inscription
+## US-033 : rate limiting synthèse IA (défini séparément)
+## ADR-006 : Redis 7 comme store de rate limiting
+
+framework:
+    rate_limiter:
+        # Inscriptions : 10 tentatives par heure et par adresse IP
+        # Sliding window = protection progressive (OWASP #8 — constitution §6)
+        registration_by_ip:
+            policy: sliding_window
+            limit: 10
+            interval: '1 hour'
+            lock_factory: lock.default.factory
+
+when@test:
+    framework:
+        rate_limiter:
+            # Tests : limite très haute + stockage dans le cache système (in-memory en test)
+            registration_by_ip:
+                policy: sliding_window
+                limit: 1000
+                interval: '1 hour'
+                cache_pool: cache.system

@@ -25,7 +25,6 @@
 
 # Docker lui-même
 /compose.override.yaml
-/docker/
 
 # Documentation et gestion de projet
 /docs/
