@@ -49,4 +49,6 @@
 
 ###> Tests / Coverage ###
 /coverage/
+/tests/junit*.xml
+/tests/pest_results.xml
 ###< Tests / Coverage ###
