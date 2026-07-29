@@ -150,6 +150,15 @@ services:
         arguments:
             $apiKey: '%env(MISTRAL_API_KEY)%'
 
+    # SynthesisCacheInterface → RedisSynthesisCache (US-011 T-011-05)
+    # Cache-aside Redis par URL+niveau (sha256(url + '_' + level), TTL 24 h)
+    App\Domain\Synthesis\SynthesisCacheInterface:
+        alias: App\Infrastructure\Synthesis\Cache\RedisSynthesisCache
+
+    App\Infrastructure\Synthesis\Cache\RedisSynthesisCache:
+        arguments:
+            $synthesisPool: '@cache.synthesis'
+
     # ── Summary (US-004) — condensés IA par article ──────────────────────────
 
     # Interface Application → implémentation

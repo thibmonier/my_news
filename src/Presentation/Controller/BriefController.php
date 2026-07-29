@@ -227,6 +227,21 @@ final class BriefController
                     <p class="story-source">{$source}</p>
                     {$summaryHtml}
                     <p class="story-excerpt">{$excerpt}</p>
+                    <div class="synthesis-level-selector" role="group" aria-label="Niveau de synthèse">
+                        <label class="level-label">Niveau :</label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{$position}" value="concise" checked aria-label="Concis (~200 mots, 3 points)">
+                            <span>Concise</span>
+                        </label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{$position}" value="detailed" aria-label="Détaillé (~500 mots, 5 points)">
+                            <span>Detailed</span>
+                        </label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{$position}" value="narrative" aria-label="Narratif (~800 mots, prose éditoriale)">
+                            <span>Narrative</span>
+                        </label>
+                    </div>
                     <div class="story-actions">
                         <a
                             href="{$sourceUrl}"
@@ -239,6 +254,7 @@ final class BriefController
                             class="synthesis-btn"
                             data-url="{$sourceUrl}"
                             data-zone="{$zoneId}"
+                            data-level-group="level-{$position}"
                             onclick="handleSynthesis(this)"
                             aria-label="Générer une synthèse IA pour : {$title}"
                         >GENERATE AI SUMMARY</button>
@@ -455,9 +471,20 @@ final class BriefController
         return <<<'JS_BLOCK'
             <script>
             async function handleSynthesis(btn) {
-              const url  = btn.dataset.url;
-              const zone = document.getElementById(btn.dataset.zone);
+              const url       = btn.dataset.url;
+              const zone      = document.getElementById(btn.dataset.zone);
+              const levelGroup = btn.dataset.levelGroup;
               if (!url || !zone) return;
+
+              // Lire le niveau sélectionné (US-011)
+              const levelInput = levelGroup
+                ? document.querySelector(`input[name="${levelGroup}"]:checked`)
+                : null;
+              const level = levelInput ? levelInput.value : 'concise';
+
+              // Timeout adapté au niveau (concise 15s, detailed 30s, narrative 50s JS)
+              const jsTimeouts = { concise: 16000, detailed: 32000, narrative: 50000 };
+              const jsTimeout  = jsTimeouts[level] || 16000;
 
               // Skeleton loading
               btn.disabled = true;
@@ -465,13 +492,13 @@ final class BriefController
               zone.innerHTML = '<div class="synthesis-skeleton" aria-busy="true">Génération en cours…</div>';
 
               const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 10000); // 10s JS timeout
+              const timeout = setTimeout(() => controller.abort(), jsTimeout);
 
               try {
                 const resp = await fetch('/api/v1/synthesis', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                  body: JSON.stringify({ url }),
+                  body: JSON.stringify({ url, level }),
                   signal: controller.signal,
                 });
                 clearTimeout(timeout);
@@ -491,14 +518,24 @@ final class BriefController
                 }
 
                 if (resp.status === 422) {
-                  zone.innerHTML = '<div class="synthesis-error">URL invalide — vérifiez le format de l\'adresse.</div>';
+                  let msg = 'URL invalide — vérifiez le format de l\'adresse.';
+                  try {
+                    const errData = await resp.json();
+                    if (errData && errData.detail) msg = errData.detail;
+                  } catch (e) { /* ignore */ }
+                  zone.innerHTML = `<div class="synthesis-error">${escHtml(msg)}</div>`;
                   btn.textContent = 'GENERATE AI SUMMARY';
                   btn.disabled = false;
                   return;
                 }
 
                 if (!resp.ok) {
-                  zone.innerHTML = '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
+                  let errorMsg = 'Service temporairement indisponible — réessayez dans quelques instants.';
+                  try {
+                    const errData = await resp.json();
+                    if (errData && errData.detail) errorMsg = errData.detail;
+                  } catch (e) { /* ignore */ }
+                  zone.innerHTML = `<div class="synthesis-error">${escHtml(errorMsg)}</div>`;
                   btn.textContent = 'GENERATE AI SUMMARY';
                   btn.disabled = false;
                   return;
@@ -511,7 +548,7 @@ final class BriefController
                 clearTimeout(timeout);
                 const isTimeout = e.name === 'AbortError';
                 zone.innerHTML = isTimeout
-                  ? '<div class="synthesis-error">Délai dépassé (10s) — réessayez dans quelques instants.</div>'
+                  ? '<div class="synthesis-error">Délai dépassé — réessayez dans quelques instants.</div>'
                   : '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
                 btn.textContent = 'GENERATE AI SUMMARY';
                 btn.disabled = false;
@@ -529,10 +566,15 @@ final class BriefController
                 ? '<p class="synthesis-partial">Contenu partiel — accès limité à la source</p>'
                 : '';
               const originalUrl = data.originalUrl || '';
-              const content = data.content || '';
+              const content     = data.content || '';
+              // Badge niveau (US-011 — INV-2 accent émeraude réservé à l'IA)
+              const levelLabel  = { concise: 'Concise', detailed: 'Detailed', narrative: 'Narrative' };
+              const levelBadge  = data.level
+                ? `<span class="synthesis-level-badge">${escHtml(levelLabel[data.level] || data.level)}</span>`
+                : '';
 
               return `<div class="synthesis-result">
-                <div class="synthesis-badge">BRIEFLY AI</div>
+                <div class="synthesis-badge">BRIEFLY AI ${levelBadge}</div>
                 <p class="synthesis-content">${escHtml(content)}</p>
                 ${keyPointsHtml ? `<ol class="synthesis-keypoints">${keyPointsHtml}</ol>` : ''}
                 ${sourcesHtml ? `<p class="synthesis-sources">Sources : ${sourcesHtml}</p>` : ''}
@@ -663,6 +705,53 @@ final class BriefController
               font-size: 14px;
             }
             .synthesis-error a { color: #dc2626; font-weight: 600; }
+            /* ── Sélecteur de niveau (US-011) ────────────────────────────────────── */
+            .synthesis-level-selector {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              flex-wrap: wrap;
+              margin-bottom: 0.5rem;
+            }
+            .level-label {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-outline);
+              text-transform: uppercase;
+            }
+            .level-option {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.25rem;
+              cursor: pointer;
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-on-surface-variant);
+            }
+            .level-option input[type="radio"] {
+              accent-color: var(--color-emerald-accent);
+              cursor: pointer;
+            }
+            .level-option input[type="radio"]:checked + span {
+              color: var(--color-emerald-accent);
+              font-weight: 600;
+            }
+            /* Badge niveau dans le résultat (US-011) */
+            .synthesis-level-badge {
+              display: inline-block;
+              font-size: 9px;
+              letter-spacing: 0.08em;
+              font-weight: 700;
+              text-transform: uppercase;
+              color: var(--color-on-primary);
+              background: var(--color-emerald-accent);
+              border-radius: 2px;
+              padding: 1px 5px;
+              margin-left: 0.375rem;
+              vertical-align: middle;
+            }
             </style>
             CSS_BLOCK;
     }

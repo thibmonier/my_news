@@ -8,9 +8,10 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Post;
 use App\Presentation\StateProcessor\QuotaStateProcessor;
 use App\Presentation\StateProcessor\UrlSynthesisProcessor;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ressource API Platform — Synthèse IA d'un article.
+ * Ressource API Platform — Synthèse IA d'un article (US-010 + US-011).
  *
  * Deux opérations :
  *
@@ -19,12 +20,16 @@ use App\Presentation\StateProcessor\UrlSynthesisProcessor;
  *    Output: synthèse stub "BRIEFLY AI:" + quota utilisé/restant
  *    Processor: QuotaStateProcessor → SynthesisStubProcessor (Sprint 1 placeholder)
  *
- * 2. POST /api/v1/synthesis  [US-010 Mistral réel]
- *    Input : corps JSON { "url": "https://..." }
- *    Output: synthèse Mistral complète + keyPoints + sources + originalUrl + isPartial
+ * 2. POST /api/v1/synthesis  [US-010 Mistral réel + US-011 multi-niveaux]
+ *    Input : corps JSON { "url": "https://...", "level": "concise|detailed|narrative" }
+ *    Output: synthèse Mistral complète + level + keyPoints + sources + originalUrl + isPartial
  *    Processor: UrlSynthesisProcessor (quota intégré + appel Mistral réel)
  *
- * Auth  : ROLE_USER requis sur les deux opérations (constitution §6 : deny by default)
+ * Validation niveau (US-011) :
+ * - level ∈ ['concise', 'detailed', 'narrative'] → HTTP 422 si invalide
+ * - level nullable/absent → interprété comme 'concise' (défaut) par UrlSynthesisProcessor
+ *
+ * Auth  : ROLE_USER requis sur les deux opérations (constitution §6 : deny by default).
  *
  * Couche Presentation (deptrac : Presentation → Domain, Application).
  */
@@ -33,13 +38,12 @@ use App\Presentation\StateProcessor\UrlSynthesisProcessor;
     operations: [
         // ── US-033 : synthèse stub par ID d'article ────────────────────────────
         // Auth : ROLE_USER enforced at firewall level (access_control security.yaml).
-        // symfony/expression-language n'est pas installé en Sprint 1 → pas de security= ici.
         new Post(
             uriTemplate: '/articles/{id}/synthesize',
             processor: QuotaStateProcessor::class,
             output: SynthesisResource::class,
         ),
-        // ── US-010 : synthèse Mistral réelle par URL ───────────────────────────
+        // ── US-010 / US-011 : synthèse Mistral réelle par URL + niveau ─────────
         new Post(
             uriTemplate: '/synthesis',
             processor: UrlSynthesisProcessor::class,
@@ -53,8 +57,9 @@ final class SynthesisResource
      * @param string $id UUID v4 de la synthèse générée
      * @param string $articleId ID de l'article synthétisé (US-033 — depuis template URI)
      * @param string $url URL source fournie par le client (US-010 — depuis body)
+     * @param string|null $level Niveau de synthèse demandé (US-011) — 'concise', 'detailed' ou 'narrative'
      * @param string $content Condensé IA préfixé "BRIEFLY AI:"
-     * @param string[] $keyPoints 3 points clés numérotés 01/02/03 (US-010)
+     * @param string[] $keyPoints Points clés numérotés 01/02/03[/04/05] (US-011)
      * @param string[] $sources Sources citées (US-010)
      * @param string $originalUrl URL source originale pour lien "OUVRIR L'ORIGINAL" (US-010)
      * @param bool $isPartial true si contenu source partiel / paywall (US-010)
@@ -66,6 +71,17 @@ final class SynthesisResource
         public readonly string $id = '',
         public readonly string $articleId = '',
         public readonly string $url = '',
+
+        /**
+         * Niveau de synthèse — whitelist stricte (US-011 T-011-06).
+         * HTTP 422 si valeur inconnue ; null/absent → 'concise' par défaut dans le processor.
+         */
+        #[Assert\Choice(
+            choices: ['concise', 'detailed', 'narrative'],
+            message: 'level must be one of: concise, detailed, narrative',
+        )]
+        public readonly ?string $level = null,
+
         public readonly string $content = '',
         /** @var string[] */
         public readonly array $keyPoints = [],

@@ -7,6 +7,8 @@ namespace App\Application\Synthesis;
 use App\Domain\Synthesis\ArticleContentFetcherInterface;
 use App\Domain\Synthesis\InvalidSynthesisUrlException;
 use App\Domain\Synthesis\MistralClientInterface;
+use App\Domain\Synthesis\SynthesisCacheInterface;
+use App\Domain\Synthesis\SynthesisLevel;
 use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisResponse;
 use App\Domain\Synthesis\SynthesisResult;
@@ -17,20 +19,23 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Service Application — Orchestration de la synthèse IA d'un article.
+ * Service Application — Orchestration de la synthèse IA d'un article (US-010 + US-011).
  *
  * Flux d'exécution :
- * 1. Validation SSRF stricte de l'URL (filter_var + rejet IP RFC1918 + loopback)
- * 2. Fetch du contenu de l'article (ArticleContentFetcherInterface)
- * 3. Appel Mistral avec prompt système contrôlé (MistralClientInterface)
- * 4. Parse de la réponse texte Mistral → SynthesisResponse structurée
- * 5. Calcul url_hash SHA-256 (jamais l'URL brute dans les logs)
- * 6. Persistence du résultat (SynthesisResultRepositoryInterface)
+ * 1. Validation SSRF stricte de l'URL (filter_var + rejet IP RFC 1918 + loopback)
+ * 2. Cache Redis (clé sha256(url . '_' . level), TTL 24 h) — retour immédiat si chaud
+ * 3. Fetch du contenu de l'article (ArticleContentFetcherInterface)
+ * 4. Appel Mistral avec prompt adapté au niveau (SynthesisLevel::promptInstructions())
+ *    et timeout adapté (SynthesisLevel::timeoutSeconds()) — US-011
+ * 5. Parse de la réponse texte Mistral → SynthesisResponse structurée
+ * 6. Calcul url_hash SHA-256 (jamais l'URL brute dans les logs)
+ * 7. Persistence du résultat avec le niveau (SynthesisResultRepositoryInterface)
+ * 8. Mise en cache de la réponse (SynthesisCacheInterface)
  *
  * Sécurité :
- * - SSRF : validation URL + résolution DNS + rejet RFC1918/loopback (OWASP A01)
+ * - SSRF : validation URL + résolution DNS + rejet RFC 1918/loopback (OWASP A01)
  * - PII : aucun email / UUID utilisateur dans le prompt Mistral (RGPD — T-010-11)
- * - Logging : url_hash uniquement, jamais l'URL brute ni l'identifiant utilisateur
+ * - Logging : url_hash et level uniquement, jamais l'URL brute ni l'identifiant utilisateur
  *
  * Deptrac : Application → Domain uniquement.
  *
@@ -38,53 +43,20 @@ use Symfony\Component\Uid\Uuid;
  */
 final class SynthesisService implements SynthesisServiceInterface
 {
-    /**
-     * Prompt système envoyé à Mistral pour la génération de synthèse.
-     *
-     * Contraintes encodées dans le prompt :
-     * - Langue de l'article conservée
-     * - Préfixe "BRIEFLY AI:"
-     * - 180-220 mots pour le condensé
-     * - 3 points clés numérotés 01/02/03
-     * - Au moins une source citée
-     *
-     * PII-safe : aucun UUID utilisateur, email ou IP dans ce prompt.
-     */
-    private const SYSTEM_PROMPT = <<<'PROMPT'
-        You are a professional news analyst for Briefly AI. Your task is to summarize articles concisely.
-
-        IMPORTANT: Respond in the SAME LANGUAGE as the article content. Do NOT translate.
-
-        Format your response EXACTLY as follows (use these exact section headers):
-
-        BRIEFLY AI: [Write a 180-220 word summary of the article here. Be factual and neutral. Start immediately after the colon.]
-
-        KEY POINTS:
-        01 [First key takeaway in one sentence]
-        02 [Second key takeaway in one sentence]
-        03 [Third key takeaway in one sentence]
-
-        SOURCES:
-        [Publication name, website domain, or author — at least one]
-
-        Rules:
-        - Do NOT include any other text outside this format
-        - The summary MUST be 180-220 words
-        - Provide EXACTLY 3 key points
-        - Cite AT LEAST one source
-        - Never mention user names, emails, or personal identifiers
-        PROMPT;
+    /** TTL cache Redis : 24 h — une entrée par URL+niveau (US-011 T-011-05). */
+    private const CACHE_TTL = 86400;
 
     public function __construct(
         private readonly MistralClientInterface $mistralClient,
         private readonly ArticleContentFetcherInterface $contentFetcher,
         private readonly SynthesisResultRepositoryInterface $repository,
         private readonly LoggerInterface $logger,
+        private readonly ?SynthesisCacheInterface $cache = null,
     ) {
     }
 
     /**
-     * Génère une synthèse IA pour l'URL fournie.
+     * Génère une synthèse IA pour l'URL fournie au niveau demandé.
      *
      * @throws InvalidSynthesisUrlException si l'URL est malformée ou cible une IP privée (SSRF)
      * @throws SynthesisUnavailableException si Mistral est inaccessible
@@ -94,24 +66,44 @@ final class SynthesisService implements SynthesisServiceInterface
         // ── 1. Validation SSRF ───────────────────────────────────────────────
         $this->validateUrlForSsrf($request->url);
 
-        // ── 2. Fetch du contenu ──────────────────────────────────────────────
+        // ── 2. Cache check ───────────────────────────────────────────────────
+        $cacheKey = $this->buildCacheKey($request->url, $request->level);
+
+        if (null !== $this->cache) {
+            $cached = $this->cache->get($cacheKey);
+
+            if (null !== $cached) {
+                $this->logger->debug('synthesis.cache_hit', [
+                    'url_hash' => hash('sha256', $request->url),
+                    'level' => $request->level->value,
+                ]);
+
+                return $cached;
+            }
+        }
+
+        // ── 3. Fetch du contenu ──────────────────────────────────────────────
         $fetched = $this->contentFetcher->fetchContent($request->url);
 
-        // ── 3. Appel Mistral ─────────────────────────────────────────────────
+        // ── 4. Appel Mistral (prompt + timeout adaptés au niveau) ────────────
         // PII-safe : le contenu de l'article ne contient jamais d'UUID utilisateur
-        $rawResponse = $this->mistralClient->complete(self::SYSTEM_PROMPT, $fetched->text);
+        $rawResponse = $this->mistralClient->complete(
+            $request->level->promptInstructions(),
+            $fetched->text,
+            $request->level->timeoutSeconds(),
+        );
 
-        // ── 4. Parse de la réponse ───────────────────────────────────────────
+        // ── 5. Parse de la réponse ───────────────────────────────────────────
         $response = $this->parseResponse($rawResponse, $request->url, $fetched->isPartial);
 
-        // ── 5. Persistence ───────────────────────────────────────────────────
+        // ── 6. Persistence ───────────────────────────────────────────────────
         $urlHash = hash('sha256', $request->url);
         $createdAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
         $result = new SynthesisResult(
             id: Uuid::v4()->toRfc4122(),
             urlHash: $urlHash,
-            level: 'standard',
+            level: $request->level->value,
             content: $response->content,
             keyPoints: $response->keyPoints,
             sources: $response->sources,
@@ -120,13 +112,33 @@ final class SynthesisService implements SynthesisServiceInterface
 
         $this->repository->save($result);
 
-        // ── 6. Logging (url_hash uniquement, jamais l'URL brute) ────────────
+        // ── 7. Cache put ─────────────────────────────────────────────────────
+        if (null !== $this->cache) {
+            $this->cache->set($cacheKey, $response, self::CACHE_TTL);
+        }
+
+        // ── 8. Logging (url_hash + level uniquement, jamais l'URL brute) ────
         $this->logger->info('synthesis.generated', [
             'url_hash' => $urlHash,
+            'level' => $request->level->value,
             'is_partial' => $fetched->isPartial,
         ]);
 
         return $response;
+    }
+
+    // ── Cache key ─────────────────────────────────────────────────────────────
+
+    /**
+     * Construit la clé de cache pour une URL + niveau donnés.
+     *
+     * Format : sha256(url . '_' . level.value)
+     * 3 clés distinctes par URL (une par niveau) — US-011 T-011-05.
+     * PII-safe : l'URL est une URL publique (pas d'identifiant utilisateur).
+     */
+    private function buildCacheKey(string $url, SynthesisLevel $level): string
+    {
+        return hash('sha256', $url . '_' . $level->value);
     }
 
     // ── SSRF Validation ───────────────────────────────────────────────────────
@@ -138,7 +150,7 @@ final class SynthesisService implements SynthesisServiceInterface
      * 1. Format URL via filter_var FILTER_VALIDATE_URL
      * 2. Schéma http ou https uniquement
      * 3. Résolution DNS du hostname
-     * 4. Rejet des IP RFC1918 + loopback + adresses réservées
+     * 4. Rejet des IP RFC 1918 + loopback + adresses réservées
      *
      * @throws InvalidSynthesisUrlException si l'URL est invalide ou SSRF détecté
      */
@@ -183,10 +195,10 @@ final class SynthesisService implements SynthesisServiceInterface
     }
 
     /**
-     * Vérifie qu'une IP n'est pas dans une plage privée RFC1918 ou réservée.
+     * Vérifie qu'une IP n'est pas dans une plage privée RFC 1918 ou réservée.
      *
      * Utilise FILTER_FLAG_NO_PRIV_RANGE + FILTER_FLAG_NO_RES_RANGE pour exclure :
-     * - RFC1918 : 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+     * - RFC 1918 : 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
      * - Loopback : 127.0.0.0/8, ::1
      * - Adresses réservées (IANA)
      *
@@ -269,7 +281,7 @@ final class SynthesisService implements SynthesisServiceInterface
     }
 
     /**
-     * Extrait les 3 points clés (lignes commençant par 01/02/03).
+     * Extrait les points clés (lignes commençant par 01/02/03/04/05).
      *
      * @return string[]
      */
@@ -277,8 +289,8 @@ final class SynthesisService implements SynthesisServiceInterface
     {
         $keyPoints = [];
 
-        // Chercher lignes commençant par 01, 02, 03 (avec ou sans espace)
-        if (preg_match_all('/^0[123]\s+.+/m', $raw, $matches) > 0) {
+        // Chercher lignes commençant par 01-05 (avec ou sans espace)
+        if (preg_match_all('/^0[12345]\s+.+/m', $raw, $matches) > 0) {
             foreach ($matches[0] as $match) {
                 $keyPoints[] = trim($match);
             }
