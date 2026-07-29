@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\ViewModel;
 
+use App\Domain\Feed\ArticleCategory;
 use App\Domain\Summary\ArticleSummary;
 
 /**
@@ -17,8 +18,9 @@ use App\Domain\Summary\ArticleSummary;
  * sourceUrl   : URL externe tracée (rel="noopener noreferrer" dans le template).
  * articleId   : UUID de l'article — utilisé pour la clé de cache condensé IA (US-004).
  * summary     : condensé IA pré-généré ou null si indisponible (US-004).
+ * category    : catégorie éditoriale de l'article (US-005) — badge coloré dans la carte.
  *
- * Couche Presentation — dépend uniquement des types PHP natifs + Domain (ArticleSummary).
+ * Couche Presentation — dépend uniquement des types PHP natifs + Domain (ArticleSummary, ArticleCategory).
  * Deptrac : Presentation:[Domain, Application].
  */
 final readonly class StoryViewModel
@@ -38,6 +40,8 @@ final readonly class StoryViewModel
         public readonly string $articleId = '',
         /** Condensé IA pré-généré (US-004) — null si non disponible. */
         public readonly ?ArticleSummary $summary = null,
+        /** Catégorie éditoriale de l'article (US-005) — défaut PRODUCTIVITY. */
+        public readonly ArticleCategory $category = ArticleCategory::Productivity,
     ) {
     }
 }

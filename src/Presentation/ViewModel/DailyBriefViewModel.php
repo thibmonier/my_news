@@ -63,6 +63,7 @@ final readonly class DailyBriefViewModel
                 sourceUrl: $s->articleUrl,
                 articleId: $s->articleId,
                 summary: $summariesByPosition[$s->position] ?? null,
+                category: $s->category,
             ),
             $view->stories,
         );

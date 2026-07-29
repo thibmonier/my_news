@@ -57,6 +57,14 @@ class DoctrineArticleEntity
     #[ORM\Column]
     private bool $isFullTextAccessible = true;
 
+    /**
+     * Catégorie éditoriale persistée (US-005).
+     * Valeur parmi : 'ai_insight', 'geopolitics', 'productivity', 'research', 'sustainability'.
+     * DEFAULT 'productivity' en base (articles sans catégorie assignée = sprint 1).
+     */
+    #[ORM\Column(length: 50, options: ['default' => 'productivity'])]
+    private string $category = 'productivity';
+
     public function __construct(
         Uuid $id,
         Uuid $sourceId,
@@ -125,5 +133,14 @@ class DoctrineArticleEntity
     public function isFullTextAccessible(): bool
     {
         return $this->isFullTextAccessible;
+    }
+
+    /**
+     * Catégorie éditoriale de l'article (US-005).
+     * Valeur parmi les 5 cases de ArticleCategory (string backing).
+     */
+    public function getCategory(): string
+    {
+        return $this->category;
     }
 }

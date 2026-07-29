@@ -161,6 +161,7 @@ final class BriefController
                 <meta property="og:type" content="website">
                 {$this->designTokensCss()}
                 {$this->pageCss()}
+                {$this->badgeCss()}
                 {$this->summaryCss()}
                 {$this->synthesisCss()}
             </head>
@@ -197,9 +198,14 @@ final class BriefController
     }
 
     /**
-     * Génère le HTML d'une story individuelle avec son condensé IA (US-004).
+     * Génère le HTML d'une story individuelle avec son condensé IA (US-004) et badge catégorie (US-005).
      *
-     * Bloc IA :
+     * Badge catégorie (US-005) :
+     * - Couleur distincte par catégorie (pas émeraude #10B981 — INV-2)
+     * - Libellé texte toujours présent (WCAG 2.1 AA — couleur + texte, pas couleur seule)
+     * - Échappe le libellé via htmlspecialchars (défense OWASP XSS)
+     *
+     * Bloc IA (US-004) :
      * - Badge "BRIEFLY AI:" avec icône auto_awesome (émeraude #10B981 INV-2)
      * - Liste de 3-4 puces (keyPoints échappées — OWASP XSS)
      * - Lien "Source : [nom]" + bouton "OUVRIR L'ORIGINAL" (rel="noopener noreferrer")
@@ -217,6 +223,14 @@ final class BriefController
         // Identifiant unique de la zone de synthèse (position 01/02/03)
         $zoneId = 'synthesis-result-' . $story->position;
 
+        // US-005 — Badge catégorie éditoriale
+        // Sécurité XSS : le libellé est une valeur fixe de l'enum mais htmlspecialchars défensif
+        $categoryValue = htmlspecialchars($story->category->value, \ENT_QUOTES | \ENT_HTML5);
+        $categoryLabel = htmlspecialchars($story->category->label(), \ENT_QUOTES | \ENT_HTML5);
+        $categoryBadgeHtml = <<<HTML
+            <span class="badge badge--{$categoryValue}" aria-label="Catégorie : {$categoryLabel}">{$categoryLabel}</span>
+            HTML;
+
         $summaryHtml = $this->renderSummaryBlock($story->summary, $story->sourceName, $story->sourceUrl);
 
         return <<<HTML
@@ -225,6 +239,7 @@ final class BriefController
                 <div class="story-body">
                     <h2 class="story-title">{$title}</h2>
                     <p class="story-source">{$source}</p>
+                    {$categoryBadgeHtml}
                     {$summaryHtml}
                     <p class="story-excerpt">{$excerpt}</p>
                     <div class="synthesis-level-selector" role="group" aria-label="Niveau de synthèse">
@@ -339,6 +354,64 @@ final class BriefController
                 </div>
             </div>
             HTML;
+    }
+
+    /**
+     * CSS des badges de catégorie éditoriale (US-005).
+     *
+     * Couleurs tokens par catégorie — JAMAIS émeraude #10B981 (réservé badge IA — INV-2).
+     * WCAG 2.1 AA : le libellé texte est toujours présent (couleur seule non exclusive — INV-5).
+     * Responsive : visible < 768px sans troncature (flex-wrap sur .story-body).
+     *
+     * Tokens CSS ajoutés à :root ici (badge colors) pour garder designTokensCss() stable.
+     */
+    private function badgeCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            /* ── Tokens couleur badges catégorie (US-005) ─────────────────────────── */
+            :root {
+              --color-badge-violet:     #7C3AED;
+              --color-badge-red:        #DC2626;
+              --color-badge-blue:       #2563EB;
+              --color-badge-orange:     #EA580C;
+              --color-badge-green-dark: #15803D;
+            }
+            /* ── Badge base (US-005) ──────────────────────────────────────────────── */
+            .badge {
+              display: inline-block;
+              font-family: var(--font-meta);
+              font-size: 10px;
+              letter-spacing: 0.08em;
+              font-weight: 700;
+              text-transform: uppercase;
+              padding: 2px 6px;
+              border-radius: 2px;
+              border: 1px solid currentColor;
+              margin-bottom: 0.5rem;
+              /* Contraste WCAG 2.1 AA : texte coloré sur fond blanc/clair */
+              background: transparent;
+              /* Couleur définie par la classe modificatrice --{category} */
+              color: var(--badge-color, var(--color-outline));
+            }
+            /* ── Modificateurs par catégorie ─────────────────────────────────────── */
+            .badge--ai_insight    { --badge-color: var(--color-badge-violet);     }
+            .badge--geopolitics   { --badge-color: var(--color-badge-red);        }
+            .badge--productivity  { --badge-color: var(--color-badge-blue);       }
+            .badge--research      { --badge-color: var(--color-badge-orange);     }
+            .badge--sustainability { --badge-color: var(--color-badge-green-dark); }
+            /* ── Dark mode (contrastes WCAG AA préservés) ────────────────────────── */
+            @media (prefers-color-scheme: dark) {
+              :root:not([data-theme="light"]) {
+                --color-badge-violet:     #A78BFA;
+                --color-badge-red:        #FCA5A5;
+                --color-badge-blue:       #93C5FD;
+                --color-badge-orange:     #FDBA74;
+                --color-badge-green-dark: #4ADE80;
+              }
+            }
+            </style>
+            CSS_BLOCK;
     }
 
     /**
