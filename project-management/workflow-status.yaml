@@ -2,7 +2,7 @@
 project: briefly-ai
 track: enterprise
 initialized_at: 2026-07-28T00:00:00Z
-current_phase: sprint-1-ready
+current_phase: sprint-2-start
 
 backlog_frozen:
   personas: "P-004 Sophie (Admin) ajouté — corrige US-021 INVEST V"
@@ -97,5 +97,17 @@ decided_by_owner:
   pricing: "Premium 12€/mois, 99€/an ; Free = brief complet + 3 synthèses/jour"
   sprint1_scope: "Walking Skeleton web strict validé (pas de mobile/Stripe réel/API/on-device)"
 
-next_action: "Phase Planification — PRD, personas, backlog (8 EPICs, Sprint 1 = Walking Skeleton web). Reste à confirmer : ressources équipe + budget IA"
-next_command: "/workflow:plan"
+sprint_2:
+  status: start
+  sprint: sprint-002-enrichissement
+  dates: "2026-08-11 → 2026-08-24"
+  points: 23
+  stories:
+    - US-004  # Condensé IA par article (5 pts)
+    - US-005  # Cartes typées catégorie (3 pts)
+    - US-011  # Niveaux de synthèse (5 pts)
+    - US-021  # CRUD sources RSS admin (5 pts)
+    - US-031  # OAuth Google/GitHub (5 pts)
+
+next_action: "Sprint 2 démarré — lancer /project:decompose-tasks 002 pour la Part 2 du Sprint Planning"
+next_command: "/project:decompose-tasks 002"

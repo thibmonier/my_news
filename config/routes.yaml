@@ -11,3 +11,5 @@ controllers:
 api_platform:
     resource: .
     type: api_platform
+
+# US-031 — Routes OAuth2 : définies par attributs #[Route] dans OAuthController

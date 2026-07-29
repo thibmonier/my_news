@@ -48,7 +48,7 @@ function mistralClientStub(
         ) {
         }
 
-        public function complete(string $systemPrompt, string $userContent): string
+        public function complete(string $systemPrompt, string $userContent, int $timeoutSeconds = 15): string
         {
             $this->capturedPrompts[] = $systemPrompt . "\n\n" . $userContent;
 
@@ -185,7 +185,7 @@ test('synthesize persiste le résultat avec url_hash SHA-256', function (): void
 
     $saved = $repo->saved[0];
     expect($saved->getUrlHash())->toBe(hash('sha256', $url));
-    expect($saved->getLevel())->toBe('standard');
+    expect($saved->getLevel())->toBe('concise');
 });
 
 // ── Scénario alternatif 1 — Paywall (contenu partiel) ────────────────────────

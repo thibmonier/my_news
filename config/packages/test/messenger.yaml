@@ -1,0 +1,17 @@
+## Test env — Messenger transport override
+## Remplace Redis Streams (async) par un transport in-memory.
+## - DSN : in-memory:// (pas de Redis en tests)
+## - consumer : valeur statique pour éviter le default:hostname:HOSTNAME
+##   qui échoue si le paramètre DI "hostname" est absent du container.
+
+framework:
+    messenger:
+        transports:
+            async:
+                dsn: 'in-memory://'
+                options:
+                    stream: messenger.async
+                    group: symfony
+                    consumer: test-worker
+            failed:
+                dsn: 'in-memory://'

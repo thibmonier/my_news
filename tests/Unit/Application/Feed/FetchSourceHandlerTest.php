@@ -85,6 +85,33 @@ function sourceRepoStub(
             return array_values(array_filter($this->map));
         }
 
+        public function findPaginated(int $page, int $perPage, ?string $query = null): array
+        {
+            return array_values(array_filter($this->map));
+        }
+
+        public function countForListing(?string $query = null): int
+        {
+            return count(array_filter($this->map));
+        }
+
+        public function findByUrl(string $url): ?Source
+        {
+            return null;
+        }
+
+        public function save(Source $source): void
+        {
+        }
+
+        public function updateStatus(string $sourceId, SourceStatus $status): void
+        {
+        }
+
+        public function softDelete(string $sourceId): void
+        {
+        }
+
         public function updateLastFetchedAt(string $sourceId, DateTimeImmutable $at): void
         {
             $this->fetchedAt = $at;

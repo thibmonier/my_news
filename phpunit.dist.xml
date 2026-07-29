@@ -36,6 +36,8 @@
     <server name="REDIS_URL" value="redis://127.0.0.1:6379"/>
     <server name="MESSENGER_TRANSPORT_DSN" value="redis://127.0.0.1:6379/messages"/>
     <server name="LOCK_DSN" value="redis://127.0.0.1:6379"/>
+    <!-- Requis par messenger.yaml default:hostname:HOSTNAME pour le consumer name -->
+    <env name="HOSTNAME" value="test-worker"/>
   </php>
   <source>
     <include>

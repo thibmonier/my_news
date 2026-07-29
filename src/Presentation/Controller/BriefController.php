@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Presentation\Controller;
 
+use App\Application\Summary\ArticleSummaryServiceInterface;
 use App\Domain\Brief\BriefPublicViewRepositoryInterface;
+use App\Domain\Summary\ArticleSummary;
 use App\Presentation\ViewModel\DailyBriefViewModel;
 use App\Presentation\ViewModel\StoryViewModel;
 use Psr\Log\LoggerInterface;
@@ -13,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Contrôleur — Page web publique du Daily Brief (US-001).
+ * Contrôleur — Page web publique du Daily Brief (US-001 + US-004).
  *
  * Routes :
  *   GET /brief → 200 (page brief ou empty state)
@@ -23,17 +25,19 @@ use Symfony\Component\Routing\Attribute\Route;
  * Pas de CSRF sur GET (constitution §6, US-001 critère sécurité).
  *
  * Gestion des états :
- * - Brief disponible    → 200 + HTML avec 3 histoires numérotées 01/02/03
+ * - Brief disponible    → 200 + HTML avec 3 histoires numérotées 01/02/03 + condensés IA (US-004)
  * - Table vide          → 200 + message "Brief en cours de préparation"
  * - Erreur base données → 503 + message générique + header Retry-After: 60
+ *
+ * US-004 — Condensé IA par article :
+ * - Appel à ArticleSummaryService pour chaque histoire avant le rendu Twig
+ * - Badge "BRIEFLY AI:" accent émeraude #10B981
+ * - Mode dégradé : badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" si LLM indispo
  *
  * SÉCURITÉ OWASP #7 (Mishandling Exceptional Conditions) :
  * - Jamais de stacktrace dans la réponse HTML
  * - Messages d'erreur génériques côté client
  * - Logging côté serveur sans données personnelles
- *
- * Note Sprint 1 : HTML inline (Twig non installé).
- * À migrer vers templates/brief/index.html.twig en Sprint 2.
  *
  * Couche Presentation — dépend de Domain + Application.
  * Deptrac : Presentation:[Domain, Application].
@@ -42,6 +46,7 @@ final class BriefController
 {
     public function __construct(
         private readonly BriefPublicViewRepositoryInterface $briefRepository,
+        private readonly ArticleSummaryServiceInterface $summaryService,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -77,7 +82,30 @@ final class BriefController
             return $this->emptyStateResponse();
         }
 
-        $viewModel = DailyBriefViewModel::fromPublicView($publicView);
+        // ── US-004 : pré-génération des condensés IA pour les 3 histoires ──────
+        $summariesByPosition = [];
+
+        foreach ($publicView->stories as $story) {
+            if ('' === $story->articleId) {
+                continue;
+            }
+
+            try {
+                $summariesByPosition[$story->position] = $this->summaryService->getSummary(
+                    $story->articleId,
+                    $story->rawContent,
+                );
+            } catch (\Throwable $e) {
+                // Dégradé silencieux — un condensé manquant ne bloque pas la page
+                $this->logger->warning('brief.summary_generation_failed', [
+                    'event' => 'brief.summary_generation_failed',
+                    'position' => $story->position,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $viewModel = DailyBriefViewModel::fromPublicView($publicView, $summariesByPosition);
 
         return new Response(
             $this->renderBriefHtml($viewModel),
@@ -104,7 +132,7 @@ final class BriefController
      * SEO : title, meta description, og:title, og:description, og:url (US-001/T-001-05).
      * Turbo Drive : data-turbo="true" + import Hotwire (US-001 scénario alternatif 2).
      * Liens OUVRIR L'ORIGINAL : rel="noopener noreferrer" (US-001 conversation §6).
-     * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement à l'IA — pas utilisé ici.
+     * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement à l'IA.
      */
     private function renderBriefHtml(DailyBriefViewModel $vm): string
     {
@@ -133,6 +161,8 @@ final class BriefController
                 <meta property="og:type" content="website">
                 {$this->designTokensCss()}
                 {$this->pageCss()}
+                {$this->badgeCss()}
+                {$this->summaryCss()}
                 {$this->synthesisCss()}
             </head>
             <body>
@@ -168,11 +198,20 @@ final class BriefController
     }
 
     /**
-     * Génère le HTML d'une story individuelle.
+     * Génère le HTML d'une story individuelle avec son condensé IA (US-004) et badge catégorie (US-005).
      *
-     * Le lien "OUVRIR L'ORIGINAL" utilise rel="noopener noreferrer" (US-001/T-001-05).
-     * Bouton "GENERATE AI SUMMARY" déclenche un appel JS vers POST /api/v1/synthesis (US-010).
-     * Invariant INV-2 : accent émeraude (#10B981) réservé au bloc synthèse IA "BRIEFLY AI:".
+     * Badge catégorie (US-005) :
+     * - Couleur distincte par catégorie (pas émeraude #10B981 — INV-2)
+     * - Libellé texte toujours présent (WCAG 2.1 AA — couleur + texte, pas couleur seule)
+     * - Échappe le libellé via htmlspecialchars (défense OWASP XSS)
+     *
+     * Bloc IA (US-004) :
+     * - Badge "BRIEFLY AI:" avec icône auto_awesome (émeraude #10B981 INV-2)
+     * - Liste de 3-4 puces (keyPoints échappées — OWASP XSS)
+     * - Lien "Source : [nom]" + bouton "OUVRIR L'ORIGINAL" (rel="noopener noreferrer")
+     * - Mode dégradé : badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" sans couleur émeraude
+     *
+     * Le lien "OUVRIR L'ORIGINAL" utilise rel="noopener noreferrer" (US-001/T-001-05 + OWASP A01).
      */
     private function renderStory(StoryViewModel $story): string
     {
@@ -184,13 +223,40 @@ final class BriefController
         // Identifiant unique de la zone de synthèse (position 01/02/03)
         $zoneId = 'synthesis-result-' . $story->position;
 
+        // US-005 — Badge catégorie éditoriale
+        // Sécurité XSS : le libellé est une valeur fixe de l'enum mais htmlspecialchars défensif
+        $categoryValue = htmlspecialchars($story->category->value, \ENT_QUOTES | \ENT_HTML5);
+        $categoryLabel = htmlspecialchars($story->category->label(), \ENT_QUOTES | \ENT_HTML5);
+        $categoryBadgeHtml = <<<HTML
+            <span class="badge badge--{$categoryValue}" aria-label="Catégorie : {$categoryLabel}">{$categoryLabel}</span>
+            HTML;
+
+        $summaryHtml = $this->renderSummaryBlock($story->summary, $story->sourceName, $story->sourceUrl);
+
         return <<<HTML
             <li class="story-card" data-position="{$position}">
                 <span class="story-number" aria-hidden="true">{$position}</span>
                 <div class="story-body">
                     <h2 class="story-title">{$title}</h2>
                     <p class="story-source">{$source}</p>
+                    {$categoryBadgeHtml}
+                    {$summaryHtml}
                     <p class="story-excerpt">{$excerpt}</p>
+                    <div class="synthesis-level-selector" role="group" aria-label="Niveau de synthèse">
+                        <label class="level-label">Niveau :</label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{$position}" value="concise" checked aria-label="Concis (~200 mots, 3 points)">
+                            <span>Concise</span>
+                        </label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{$position}" value="detailed" aria-label="Détaillé (~500 mots, 5 points)">
+                            <span>Detailed</span>
+                        </label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{$position}" value="narrative" aria-label="Narratif (~800 mots, prose éditoriale)">
+                            <span>Narrative</span>
+                        </label>
+                    </div>
                     <div class="story-actions">
                         <a
                             href="{$sourceUrl}"
@@ -203,6 +269,7 @@ final class BriefController
                             class="synthesis-btn"
                             data-url="{$sourceUrl}"
                             data-zone="{$zoneId}"
+                            data-level-group="level-{$position}"
                             onclick="handleSynthesis(this)"
                             aria-label="Générer une synthèse IA pour : {$title}"
                         >GENERATE AI SUMMARY</button>
@@ -211,6 +278,254 @@ final class BriefController
                 </div>
             </li>
             HTML;
+    }
+
+    /**
+     * Génère le bloc HTML du condensé IA (US-004).
+     *
+     * Cas nominal (isDegraded = false) :
+     * - Badge "BRIEFLY AI:" émeraude avec icône auto_awesome (INV-2)
+     * - Liste <ul> de 3-4 puces échappées via htmlspecialchars (OWASP XSS)
+     * - Lien "Source : [nom]" + bouton "OUVRIR L'ORIGINAL" rel="noopener noreferrer"
+     *
+     * Cas dégradé (isDegraded = true ou $summary = null) :
+     * - Badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" (pas de couleur émeraude)
+     * - Contenu RSS brut échappé (≤ 280 chars)
+     *
+     * Sécurité XSS : TOUT le contenu IA est échappé via htmlspecialchars().
+     * Aucun filtre `raw` — la réponse Mistral/OpenAI est traitée comme non fiable.
+     */
+    private function renderSummaryBlock(?ArticleSummary $summary, string $sourceName, string $sourceUrl): string
+    {
+        if (null === $summary) {
+            // Pas de condensé disponible — aucun bloc affiché
+            return '';
+        }
+
+        $escapedSourceName = htmlspecialchars($sourceName, \ENT_QUOTES | \ENT_HTML5);
+        $escapedSourceUrl = htmlspecialchars($sourceUrl, \ENT_QUOTES | \ENT_HTML5);
+
+        if ($summary->isDegraded) {
+            $degradedContent = htmlspecialchars($summary->degradedContent, \ENT_QUOTES | \ENT_HTML5);
+
+            return <<<HTML
+                <div class="ai-summary ai-summary--degraded" role="region" aria-label="Résumé automatique indisponible">
+                    <div class="ai-summary__badge ai-summary__badge--degraded">
+                        <span class="ai-summary__badge-text">RÉSUMÉ AUTOMATIQUE INDISPONIBLE</span>
+                    </div>
+                    <p class="ai-summary__degraded-content">{$degradedContent}</p>
+                    <p class="ai-summary__source">Source : {$escapedSourceName}</p>
+                    <a
+                        href="{$escapedSourceUrl}"
+                        class="ai-summary__open-link"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                    >OUVRIR L'ORIGINAL</a>
+                </div>
+                HTML;
+        }
+
+        // ── Cas nominal : condensé IA avec badge émeraude (INV-2) ─────────────
+        $bulletsHtml = '';
+
+        foreach ($summary->keyPoints as $bullet) {
+            // XSS : échappement systématique de la réponse LLM (US-004 Conversation §6)
+            $escapedBullet = htmlspecialchars($bullet, \ENT_QUOTES | \ENT_HTML5);
+            $bulletsHtml .= "<li class=\"ai-summary__bullet\">{$escapedBullet}</li>\n";
+        }
+
+        return <<<HTML
+            <div class="ai-summary ai-summary--nominal briefly-ai-badge" role="region" aria-label="Condensé IA Briefly AI">
+                <div class="ai-summary__badge">
+                    <span class="material-symbols-rounded ai-summary__icon" aria-hidden="true">auto_awesome</span>
+                    <span class="ai-summary__badge-text">BRIEFLY AI:</span>
+                </div>
+                <ul class="ai-summary__bullets summary-bullets">
+                    {$bulletsHtml}
+                </ul>
+                <div class="ai-summary__footer">
+                    <p class="ai-summary__source">Source : <span>{$escapedSourceName}</span></p>
+                    <a
+                        href="{$escapedSourceUrl}"
+                        class="ai-summary__open-link"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                    >OUVRIR L'ORIGINAL</a>
+                </div>
+            </div>
+            HTML;
+    }
+
+    /**
+     * CSS des badges de catégorie éditoriale (US-005).
+     *
+     * Couleurs tokens par catégorie — JAMAIS émeraude #10B981 (réservé badge IA — INV-2).
+     * WCAG 2.1 AA : le libellé texte est toujours présent (couleur seule non exclusive — INV-5).
+     * Responsive : visible < 768px sans troncature (flex-wrap sur .story-body).
+     *
+     * Tokens CSS ajoutés à :root ici (badge colors) pour garder designTokensCss() stable.
+     */
+    private function badgeCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            /* ── Tokens couleur badges catégorie (US-005) ─────────────────────────── */
+            :root {
+              --color-badge-violet:     #7C3AED;
+              --color-badge-red:        #DC2626;
+              --color-badge-blue:       #2563EB;
+              --color-badge-orange:     #EA580C;
+              --color-badge-green-dark: #15803D;
+            }
+            /* ── Badge base (US-005) ──────────────────────────────────────────────── */
+            .badge {
+              display: inline-block;
+              font-family: var(--font-meta);
+              font-size: 10px;
+              letter-spacing: 0.08em;
+              font-weight: 700;
+              text-transform: uppercase;
+              padding: 2px 6px;
+              border-radius: 2px;
+              border: 1px solid currentColor;
+              margin-bottom: 0.5rem;
+              /* Contraste WCAG 2.1 AA : texte coloré sur fond blanc/clair */
+              background: transparent;
+              /* Couleur définie par la classe modificatrice --{category} */
+              color: var(--badge-color, var(--color-outline));
+            }
+            /* ── Modificateurs par catégorie ─────────────────────────────────────── */
+            .badge--ai_insight    { --badge-color: var(--color-badge-violet);     }
+            .badge--geopolitics   { --badge-color: var(--color-badge-red);        }
+            .badge--productivity  { --badge-color: var(--color-badge-blue);       }
+            .badge--research      { --badge-color: var(--color-badge-orange);     }
+            .badge--sustainability { --badge-color: var(--color-badge-green-dark); }
+            /* ── Dark mode (contrastes WCAG AA préservés) ────────────────────────── */
+            @media (prefers-color-scheme: dark) {
+              :root:not([data-theme="light"]) {
+                --color-badge-violet:     #A78BFA;
+                --color-badge-red:        #FCA5A5;
+                --color-badge-blue:       #93C5FD;
+                --color-badge-orange:     #FDBA74;
+                --color-badge-green-dark: #4ADE80;
+              }
+            }
+            </style>
+            CSS_BLOCK;
+    }
+
+    /**
+     * CSS du bloc condensé IA (US-004).
+     *
+     * Invariant INV-2 : accent émeraude #10B981 RÉSERVÉ aux éléments IA.
+     * Classe `.briefly-ai-badge` : identifiant de test E2E (T-004-12).
+     * Classe `.summary-bullets` : sélecteur de test E2E (T-004-12).
+     */
+    private function summaryCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            /* ── Condensé IA (US-004) ─────────────────────────────────────────────── */
+            .ai-summary {
+              border-radius: var(--radius);
+              padding: 0.875rem 1rem;
+              margin-bottom: 1rem;
+            }
+            /* Cas nominal : bordure émeraude (INV-2 — réservé à l'IA) */
+            .ai-summary--nominal {
+              background: linear-gradient(135deg, rgba(16,185,129,0.05) 0%, transparent 100%);
+              border: 1px solid var(--color-emerald-accent);
+            }
+            /* Cas dégradé : bordure neutre (pas de couleur émeraude — INV-2) */
+            .ai-summary--degraded {
+              background: var(--color-surface-card);
+              border: 1px dashed var(--color-surface-border);
+            }
+            .ai-summary__badge {
+              display: flex;
+              align-items: center;
+              gap: 0.25rem;
+              margin-bottom: 0.5rem;
+            }
+            .ai-summary__icon {
+              font-size: 14px;
+              color: var(--color-emerald-accent);
+              font-family: 'Material Symbols Rounded';
+              font-style: normal;
+              font-weight: normal;
+            }
+            .ai-summary__badge-text {
+              font-family: var(--font-meta);
+              font-size: 10px;
+              letter-spacing: 0.1em;
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+            /* Badge émeraude uniquement pour le nominal (INV-2) */
+            .ai-summary--nominal .ai-summary__badge-text {
+              color: var(--color-emerald-accent);
+            }
+            /* Badge neutre pour le dégradé */
+            .ai-summary--degraded .ai-summary__badge-text {
+              color: var(--color-outline);
+              letter-spacing: 0.05em;
+            }
+            .ai-summary__bullets {
+              list-style: none;
+              padding: 0;
+              margin: 0 0 0.75rem 0;
+            }
+            .ai-summary__bullet {
+              font-size: 14px;
+              line-height: 1.5;
+              color: var(--color-on-surface-variant);
+              padding: 0.2rem 0 0.2rem 0.625rem;
+              border-left: 2px solid var(--color-emerald-accent);
+              margin-bottom: 0.25rem;
+            }
+            .ai-summary__footer {
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+              flex-wrap: wrap;
+            }
+            .ai-summary__source {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-outline);
+              flex: 1;
+            }
+            .ai-summary__source span { color: var(--color-on-surface-variant); }
+            .ai-summary__open-link {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              font-weight: 700;
+              text-transform: uppercase;
+              color: var(--color-emerald-accent);
+              text-decoration: none;
+              white-space: nowrap;
+            }
+            .ai-summary--degraded .ai-summary__open-link {
+              color: var(--color-slate-gray);
+            }
+            .ai-summary__open-link:hover { text-decoration: underline; }
+            .ai-summary__degraded-content {
+              font-size: var(--fs-body-md);
+              color: var(--color-on-surface-variant);
+              font-style: italic;
+              margin-bottom: 0.5rem;
+            }
+            /* Google Material Symbols (inline font via CDN-free fallback) */
+            @font-face {
+              font-family: 'Material Symbols Rounded';
+              font-style: normal;
+              font-weight: 400;
+              src: url(https://fonts.gstatic.com/s/materialsymbolsrounded/v222/syl0-zNym6-2jv1w84WQhX9R_jn9T5aQ.woff2) format('woff2');
+            }
+            </style>
+            CSS_BLOCK;
     }
 
     /**
@@ -229,9 +544,20 @@ final class BriefController
         return <<<'JS_BLOCK'
             <script>
             async function handleSynthesis(btn) {
-              const url  = btn.dataset.url;
-              const zone = document.getElementById(btn.dataset.zone);
+              const url       = btn.dataset.url;
+              const zone      = document.getElementById(btn.dataset.zone);
+              const levelGroup = btn.dataset.levelGroup;
               if (!url || !zone) return;
+
+              // Lire le niveau sélectionné (US-011)
+              const levelInput = levelGroup
+                ? document.querySelector(`input[name="${levelGroup}"]:checked`)
+                : null;
+              const level = levelInput ? levelInput.value : 'concise';
+
+              // Timeout adapté au niveau (concise 15s, detailed 30s, narrative 50s JS)
+              const jsTimeouts = { concise: 16000, detailed: 32000, narrative: 50000 };
+              const jsTimeout  = jsTimeouts[level] || 16000;
 
               // Skeleton loading
               btn.disabled = true;
@@ -239,13 +565,13 @@ final class BriefController
               zone.innerHTML = '<div class="synthesis-skeleton" aria-busy="true">Génération en cours…</div>';
 
               const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 10000); // 10s JS timeout
+              const timeout = setTimeout(() => controller.abort(), jsTimeout);
 
               try {
                 const resp = await fetch('/api/v1/synthesis', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                  body: JSON.stringify({ url }),
+                  body: JSON.stringify({ url, level }),
                   signal: controller.signal,
                 });
                 clearTimeout(timeout);
@@ -265,14 +591,24 @@ final class BriefController
                 }
 
                 if (resp.status === 422) {
-                  zone.innerHTML = '<div class="synthesis-error">URL invalide — vérifiez le format de l\'adresse.</div>';
+                  let msg = 'URL invalide — vérifiez le format de l\'adresse.';
+                  try {
+                    const errData = await resp.json();
+                    if (errData && errData.detail) msg = errData.detail;
+                  } catch (e) { /* ignore */ }
+                  zone.innerHTML = `<div class="synthesis-error">${escHtml(msg)}</div>`;
                   btn.textContent = 'GENERATE AI SUMMARY';
                   btn.disabled = false;
                   return;
                 }
 
                 if (!resp.ok) {
-                  zone.innerHTML = '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
+                  let errorMsg = 'Service temporairement indisponible — réessayez dans quelques instants.';
+                  try {
+                    const errData = await resp.json();
+                    if (errData && errData.detail) errorMsg = errData.detail;
+                  } catch (e) { /* ignore */ }
+                  zone.innerHTML = `<div class="synthesis-error">${escHtml(errorMsg)}</div>`;
                   btn.textContent = 'GENERATE AI SUMMARY';
                   btn.disabled = false;
                   return;
@@ -285,7 +621,7 @@ final class BriefController
                 clearTimeout(timeout);
                 const isTimeout = e.name === 'AbortError';
                 zone.innerHTML = isTimeout
-                  ? '<div class="synthesis-error">Délai dépassé (10s) — réessayez dans quelques instants.</div>'
+                  ? '<div class="synthesis-error">Délai dépassé — réessayez dans quelques instants.</div>'
                   : '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
                 btn.textContent = 'GENERATE AI SUMMARY';
                 btn.disabled = false;
@@ -303,10 +639,15 @@ final class BriefController
                 ? '<p class="synthesis-partial">Contenu partiel — accès limité à la source</p>'
                 : '';
               const originalUrl = data.originalUrl || '';
-              const content = data.content || '';
+              const content     = data.content || '';
+              // Badge niveau (US-011 — INV-2 accent émeraude réservé à l'IA)
+              const levelLabel  = { concise: 'Concise', detailed: 'Detailed', narrative: 'Narrative' };
+              const levelBadge  = data.level
+                ? `<span class="synthesis-level-badge">${escHtml(levelLabel[data.level] || data.level)}</span>`
+                : '';
 
               return `<div class="synthesis-result">
-                <div class="synthesis-badge">BRIEFLY AI</div>
+                <div class="synthesis-badge">BRIEFLY AI ${levelBadge}</div>
                 <p class="synthesis-content">${escHtml(content)}</p>
                 ${keyPointsHtml ? `<ol class="synthesis-keypoints">${keyPointsHtml}</ol>` : ''}
                 ${sourcesHtml ? `<p class="synthesis-sources">Sources : ${sourcesHtml}</p>` : ''}
@@ -437,6 +778,53 @@ final class BriefController
               font-size: 14px;
             }
             .synthesis-error a { color: #dc2626; font-weight: 600; }
+            /* ── Sélecteur de niveau (US-011) ────────────────────────────────────── */
+            .synthesis-level-selector {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              flex-wrap: wrap;
+              margin-bottom: 0.5rem;
+            }
+            .level-label {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-outline);
+              text-transform: uppercase;
+            }
+            .level-option {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.25rem;
+              cursor: pointer;
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-on-surface-variant);
+            }
+            .level-option input[type="radio"] {
+              accent-color: var(--color-emerald-accent);
+              cursor: pointer;
+            }
+            .level-option input[type="radio"]:checked + span {
+              color: var(--color-emerald-accent);
+              font-weight: 600;
+            }
+            /* Badge niveau dans le résultat (US-011) */
+            .synthesis-level-badge {
+              display: inline-block;
+              font-size: 9px;
+              letter-spacing: 0.08em;
+              font-weight: 700;
+              text-transform: uppercase;
+              color: var(--color-on-primary);
+              background: var(--color-emerald-accent);
+              border-radius: 2px;
+              padding: 1px 5px;
+              margin-left: 0.375rem;
+              vertical-align: middle;
+            }
             </style>
             CSS_BLOCK;
     }
@@ -528,7 +916,7 @@ final class BriefController
     /**
      * Design tokens CSS (variables issues de design-tokens.css — INV-7).
      *
-     * Inline Sprint 1 (Twig non disponible, pas d'assets pipeline).
+     * Inline Sprint 1 (Twig non installé).
      * À remplacer par <link href="/build/design-tokens.css"> quand Encore/Vite sera configuré.
      */
     private function designTokensCss(): string

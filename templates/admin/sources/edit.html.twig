@@ -1,0 +1,15 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block title %}Éditer « {{ source.name }} » — Briefly AI Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Éditer la source « {{ source.name }} »</h1>
+    <span class="badge {{ source.status.badgeClass() }}">{{ source.status.label() }}</span>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    {% block submit_label %}Enregistrer les modifications{% endblock %}
+    {% include 'admin/sources/_form.html.twig' %}
+</div>
+{% endblock %}

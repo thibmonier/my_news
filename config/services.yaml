@@ -81,6 +81,10 @@ services:
     App\Application\User\PasswordHasherInterface:
         alias: App\Infrastructure\User\Security\SymfonyPasswordHasher
 
+    # ── User (US-031) — OAuth2 ports → Infrastructure adapters ───────────────
+    App\Domain\User\OAuthAccountRepositoryInterface:
+        alias: App\Infrastructure\User\Persistence\DoctrineOAuthAccountRepository
+
     # ── Brief (US-001 + US-002 + US-003) — Domain ports → Infrastructure adapters ─
     App\Domain\Brief\DailyBriefRepositoryInterface:
         alias: App\Infrastructure\Brief\Persistence\DoctrineDailyBriefRepository
@@ -149,3 +153,46 @@ services:
     App\Infrastructure\Synthesis\Ai\MistralApiClient:
         arguments:
             $apiKey: '%env(MISTRAL_API_KEY)%'
+
+    # SynthesisCacheInterface → RedisSynthesisCache (US-011 T-011-05)
+    # Cache-aside Redis par URL+niveau (sha256(url + '_' + level), TTL 24 h)
+    App\Domain\Synthesis\SynthesisCacheInterface:
+        alias: App\Infrastructure\Synthesis\Cache\RedisSynthesisCache
+
+    App\Infrastructure\Synthesis\Cache\RedisSynthesisCache:
+        arguments:
+            $synthesisPool: '@cache.synthesis'
+
+    # ── Summary (US-004) — condensés IA par article ──────────────────────────
+
+    # Interface Application → implémentation
+    App\Application\Summary\ArticleSummaryServiceInterface:
+        alias: App\Application\Summary\ArticleSummaryService
+
+    # Ports Domain → Adapters Infrastructure
+    App\Domain\Summary\ArticleSummaryRepositoryInterface:
+        alias: App\Infrastructure\Summary\Persistence\DoctrineArticleSummaryRepository
+
+    App\Domain\Summary\SummaryCacheInterface:
+        alias: App\Infrastructure\Summary\Cache\RedisSummaryCache
+
+    App\Domain\Summary\SummaryCircuitBreakerInterface:
+        alias: App\Infrastructure\Summary\CircuitBreaker\SummaryCircuitBreaker
+
+    # RedisSummaryCache : injection du pool cache.synthesis (défini dans cache.yaml)
+    App\Infrastructure\Summary\Cache\RedisSummaryCache:
+        arguments:
+            $synthesisPool: '@cache.synthesis'
+
+    # OpenAiSummaryClient : injection de la clé API (env OPENAI_API_KEY)
+    App\Infrastructure\Summary\Ai\OpenAiSummaryClient:
+        arguments:
+            $apiKey: '%env(OPENAI_API_KEY)%'
+
+    # ArticleSummaryService : injection explicite des deux clients IA (évite l'ambiguïté)
+    # MistralSummaryClient réutilise MistralClientInterface (Synthesis BC — DRY)
+    # OpenAiSummaryClient utilise l'HttpClient Symfony par défaut (autowire)
+    App\Application\Summary\ArticleSummaryService:
+        arguments:
+            $mistralClient: '@App\Infrastructure\Summary\Ai\MistralSummaryClient'
+            $openAiClient: '@App\Infrastructure\Summary\Ai\OpenAiSummaryClient'

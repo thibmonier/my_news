@@ -9,9 +9,9 @@
 | **Persona** | P-002 Priya — Chercheuse stratégie, 31 ans |
 | **Story Points** | 5 (Fibonacci) |
 | **Priorité MoSCoW** | Must Have |
-| **Sprint** | backlog |
+| **Sprint** | sprint-002-enrichissement |
 
-**Dépend de :** US-010 (endpoint de synthèse), US-012 (cache Redis par niveau)
+**Dépend de :** US-010 (endpoint de synthèse — livré Sprint 1). Note substitution Sprint 2 : le `SummaryService` créé pour US-004 fournit la génération multi-niveaux ; le cache Redis par niveau (`sha256(article_id + "_" + summary_level)`, TTL 24h) est couvert par la tâche T-011-05 intra-sprint — US-012 n'est donc pas requise dans ce sprint.
 
 ---
 

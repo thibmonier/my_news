@@ -37,8 +37,7 @@ final class MistralApiClient implements MistralClientInterface
 {
     private const API_URL = 'https://api.mistral.ai/v1/chat/completions';
     private const MODEL = 'mistral-small-latest';
-    private const TIMEOUT = 15.0;   // secondes — T-010-04
-    private const MAX_TOKENS = 600;
+    private const MAX_TOKENS = 800;  // élargi pour niveaux Detailed/Narrative (US-011)
     private const TEMPERATURE = 0.3;
 
     public function __construct(
@@ -53,17 +52,18 @@ final class MistralApiClient implements MistralClientInterface
      *
      * @param string $systemPrompt Prompt système contrôlant le format de sortie
      * @param string $userContent Contenu de l'article à synthétiser (PII-free)
+     * @param int $timeoutSeconds Timeout HTTP en secondes — adapté au niveau (US-011)
      *
      * @throws SynthesisUnavailableException si timeout, erreur réseau, ou HTTP 5xx
      */
-    public function complete(string $systemPrompt, string $userContent): string
+    public function complete(string $systemPrompt, string $userContent, int $timeoutSeconds = 15): string
     {
         try {
             $response = $this->httpClient->request(
                 'POST',
                 self::API_URL,
                 [
-                    'timeout' => self::TIMEOUT,
+                    'timeout' => (float) $timeoutSeconds,
                     'headers' => [
                         'Authorization' => 'Bearer ' . $this->apiKey,
                         'Content-Type' => 'application/json',

@@ -23,11 +23,50 @@ interface SourceRepositoryInterface
     public function findById(string $id): ?Source;
 
     /**
-     * Retourne toutes les sources avec status='active'.
+     * Retourne toutes les sources avec status='active' et deleted_at IS NULL.
      *
      * @return list<Source>
      */
     public function findAllActive(): array;
+
+    /**
+     * Retourne les sources paginées (hors soft-deleted).
+     * Filtre optionnel ILIKE sur name et url si $query non nul.
+     *
+     * @return list<Source>
+     */
+    public function findPaginated(int $page, int $perPage, ?string $query = null): array;
+
+    /**
+     * Compte les sources hors soft-deleted (pour la pagination).
+     * Filtre optionnel ILIKE sur name et url si $query non nul.
+     */
+    public function countForListing(?string $query = null): int;
+
+    /**
+     * Trouve une source par son URL exacte (pour contrôle d'unicité).
+     */
+    public function findByUrl(string $url): ?Source;
+
+    /**
+     * Persiste une source (création ou mise à jour).
+     * Identifié par l'ID : crée si inexistant, met à jour sinon.
+     */
+    public function save(Source $source): void;
+
+    /**
+     * Met à jour le statut d'une source.
+     *
+     * @param non-empty-string $sourceId UUID v4
+     */
+    public function updateStatus(string $sourceId, SourceStatus $status): void;
+
+    /**
+     * Soft-delete : status=deleted, deleted_at=now().
+     *
+     * @param non-empty-string $sourceId UUID v4
+     */
+    public function softDelete(string $sourceId): void;
 
     /**
      * Met à jour last_fetched_at pour la source identifiée.

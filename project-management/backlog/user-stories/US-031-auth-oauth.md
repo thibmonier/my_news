@@ -9,7 +9,7 @@
 | Persona | P-001 Thomas, cadre dirigeant tech / P-002 Priya, chercheuse stratégie |
 | Story Points | 5 |
 | Priorité MoSCoW | Must Have |
-| Sprint | backlog |
+| Sprint | sprint-002-enrichissement |
 
 ---
 

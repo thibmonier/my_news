@@ -6,6 +6,7 @@ namespace App\Presentation\ViewModel;
 
 use App\Domain\Brief\BriefPublicView;
 use App\Domain\Brief\BriefStoryPublicView;
+use App\Domain\Summary\ArticleSummary;
 
 /**
  * ViewModel — Vue publique du Daily Brief (US-001/T-001-02).
@@ -18,6 +19,8 @@ use App\Domain\Brief\BriefStoryPublicView;
  *
  * La logique de troncature (280 chars) est déjà appliquée par le repository.
  * La logique de formatage de la date est dans fromPublicView() (ViewModel, pas template).
+ *
+ * US-004 : fromPublicView() accepte un tableau optionnel de condensés IA indexés par position.
  *
  * Couche Presentation — dépend de Domain (BriefPublicView) uniquement.
  * Deptrac : Presentation:[Domain, Application].
@@ -40,8 +43,10 @@ final readonly class DailyBriefViewModel
      *
      * Formatage de la date : "d M Y H:i" + " UTC" (US-001 critère "DD MMM YYYY HH:MM UTC").
      * Conversion en UTC explicite avant formatage.
+     *
+     * @param array<int, ArticleSummary> $summariesByPosition Condensés IA indexés par position (1, 2, 3) — US-004
      */
-    public static function fromPublicView(BriefPublicView $view): self
+    public static function fromPublicView(BriefPublicView $view, array $summariesByPosition = []): self
     {
         $utc = new \DateTimeZone('UTC');
         $updatedAt = $view->updatedAt->setTimezone($utc);
@@ -56,6 +61,9 @@ final readonly class DailyBriefViewModel
                 sourceName: $s->sourceName,
                 excerpt: $s->excerpt,
                 sourceUrl: $s->articleUrl,
+                articleId: $s->articleId,
+                summary: $summariesByPosition[$s->position] ?? null,
+                category: $s->category,
             ),
             $view->stories,
         );

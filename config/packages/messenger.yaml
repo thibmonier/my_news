@@ -34,3 +34,7 @@ framework:
             App\Application\Feed\FetchSource\FetchSourceMessage: async
             # US-002 : génération du Daily Brief — un message par date
             App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefMessage: async
+            # US-021 : validation asynchrone d'une source (HEAD HTTP → status active|validation_failed)
+            App\Application\Feed\ValidateSource\ValidateSourceMessage: async
+            # US-021 : mise à jour groupée (dispatch un FetchSourceMessage par source active)
+            App\Application\Feed\BulkFetch\BulkFetchMessage: async
