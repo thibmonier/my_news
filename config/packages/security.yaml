@@ -73,6 +73,7 @@ security:
         # Routes authentifiées
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/dashboard, roles: ROLE_USER }
+        - { path: ^/profile, roles: ROLE_USER }         # US-032 : profil utilisateur — authentification requise
         - { path: ^/api/v1/quota, roles: ROLE_USER }          # US-033 : quota endpoint authentifié
         - { path: ^/api/v1/synthesis, roles: ROLE_USER }    # US-010 : synthèse IA — authentification requise
         - { path: ^/api/v1/articles, roles: ROLE_USER }     # US-010/US-033 : synthesize par article ID

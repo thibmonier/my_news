@@ -65,6 +65,11 @@ function makeUserRepositoryStub(
             return $this->findByIdReturn;
         }
 
+        public function findByEmailPendingToken(string $token): ?User
+        {
+            return null; // Non utilisé dans OAuthAuthenticateHandler
+        }
+
         public function getSaveCallCount(): int
         {
             return $this->saveCallCount;

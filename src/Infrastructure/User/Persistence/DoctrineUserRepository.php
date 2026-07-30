@@ -66,6 +66,13 @@ final class DoctrineUserRepository implements UserRepositoryInterface
         return $entity?->toDomainEntity();
     }
 
+    public function findByEmailPendingToken(string $token): ?User
+    {
+        $entity = $this->repository->findOneBy(['emailPendingToken' => $token]);
+
+        return $entity?->toDomainEntity();
+    }
+
     /**
      * Trouve l'entité Doctrine directement (usage interne Infrastructure/Presentation
      * pour l'intégration avec Symfony Security).

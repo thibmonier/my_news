@@ -40,4 +40,11 @@ interface UserRepositoryInterface
      * @return User|null null si l'identifiant est inconnu
      */
     public function findById(string $id): ?User;
+
+    /**
+     * Trouve un utilisateur par son token de confirmation de changement d'email.
+     *
+     * @return User|null null si le token est inconnu ou expiré
+     */
+    public function findByEmailPendingToken(string $token): ?User;
 }
