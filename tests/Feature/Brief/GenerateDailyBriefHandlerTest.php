@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Application\Brief\FeaturedSummary\FeaturedSummaryServiceInterface;
 use App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefHandler;
 use App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefMessage;
 use App\Domain\Brief\BriefGenerationFailedEvent;
+use App\Domain\Brief\BriefPublicViewRepositoryInterface;
 use App\Domain\Brief\BriefSelectorService;
 use App\Domain\Brief\BriefSelectorServiceInterface;
+use App\Domain\Brief\DailyBriefRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -116,11 +119,19 @@ test('Handler : 0 articles → BriefGenerationFailedEvent dispatché et log ERRO
     $loggerMock->method('info');
     $loggerMock->method('warning');
 
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null);
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
     $handler = new GenerateDailyBriefHandler(
         $selectorMock,
         $dispatcherMock,
         $loggerMock,
         featureLockFactoryStub(),
+        $featuredSummaryService,
+        $dailyBriefRepository,
+        $briefPublicViewRepository,
     );
 
     $msg = new GenerateDailyBriefMessage('2026-07-28');
@@ -150,11 +161,19 @@ test('Handler : timeout DB → exception propagée pour retry Messenger', functi
     $loggerMock->method('info');
     $loggerMock->method('warning');
 
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null);
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
     $handler = new GenerateDailyBriefHandler(
         $selectorMock,
         $dispatcherMock,
         $loggerMock,
         featureLockFactoryStub(),
+        $featuredSummaryService,
+        $dailyBriefRepository,
+        $briefPublicViewRepository,
     );
 
     $msg = new GenerateDailyBriefMessage('2026-07-28');
@@ -184,11 +203,19 @@ test('Handler : sélection réussie → log INFO brief.batch_success émis, pas 
             $loggedInfos[] = $context['event'] ?? $message;
         });
 
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null);
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
     $handler = new GenerateDailyBriefHandler(
         $selectorMock,
         $dispatcherMock,
         $loggerMock,
         featureLockFactoryStub(),
+        $featuredSummaryService,
+        $dailyBriefRepository,
+        $briefPublicViewRepository,
     );
 
     $msg = new GenerateDailyBriefMessage('2026-07-28');

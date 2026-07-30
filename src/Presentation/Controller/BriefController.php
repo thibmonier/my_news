@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Presentation\Controller;
 
+use App\Application\Brief\FeaturedSummary\FeaturedSummaryServiceInterface;
 use App\Application\Summary\ArticleSummaryServiceInterface;
 use App\Domain\Brief\BriefPublicViewRepositoryInterface;
+use App\Domain\Brief\FeaturedSummaryDTO;
 use App\Domain\Summary\ArticleSummary;
 use App\Presentation\ViewModel\DailyBriefViewModel;
 use App\Presentation\ViewModel\StoryViewModel;
@@ -15,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Contrôleur — Page web publique du Daily Brief (US-001 + US-004).
+ * Contrôleur — Page web publique du Daily Brief (US-001 + US-004 + US-006).
  *
  * Routes :
  *   GET /brief → 200 (page brief ou empty state)
@@ -25,7 +27,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * Pas de CSRF sur GET (constitution §6, US-001 critère sécurité).
  *
  * Gestion des états :
- * - Brief disponible    → 200 + HTML avec 3 histoires numérotées 01/02/03 + condensés IA (US-004)
+ * - Brief disponible    → 200 + HTML avec Featured Summary (desktop) + 3 histoires + condensés IA
  * - Table vide          → 200 + message "Brief en cours de préparation"
  * - Erreur base données → 503 + message générique + header Retry-After: 60
  *
@@ -33,6 +35,13 @@ use Symfony\Component\Routing\Attribute\Route;
  * - Appel à ArticleSummaryService pour chaque histoire avant le rendu Twig
  * - Badge "BRIEFLY AI:" accent émeraude #10B981
  * - Mode dégradé : badge "RÉSUMÉ AUTOMATIQUE INDISPONIBLE" si LLM indispo
+ *
+ * US-006 — Featured Summary desktop :
+ * - Section narrative en tête du /brief (badge BRIEFLY AI: émeraude)
+ * - Masquée sur mobile (< 768px) via CSS `display:none`
+ * - CTA sticky "Lire le brief complet" → ancre #brief-stories (même page)
+ * - Fallback : texte générique sans badge émeraude si Mistral KO
+ * - OWASP XSS : contenu Mistral échappé via htmlspecialchars()
  *
  * SÉCURITÉ OWASP #7 (Mishandling Exceptional Conditions) :
  * - Jamais de stacktrace dans la réponse HTML
@@ -48,6 +57,7 @@ final class BriefController
         private readonly BriefPublicViewRepositoryInterface $briefRepository,
         private readonly ArticleSummaryServiceInterface $summaryService,
         private readonly LoggerInterface $logger,
+        private readonly ?FeaturedSummaryServiceInterface $featuredSummaryService = null,
     ) {
     }
 
@@ -107,8 +117,25 @@ final class BriefController
 
         $viewModel = DailyBriefViewModel::fromPublicView($publicView, $summariesByPosition);
 
+        // ── US-006 : Récupération du Featured Summary (desktop) ──────────────
+        $featuredSummary = null;
+
+        if (null !== $this->featuredSummaryService) {
+            try {
+                $featuredSummary = $this->featuredSummaryService->getForToday(
+                    new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+                );
+            } catch (\Throwable $e) {
+                // Non-bloquant : la section est simplement absente (pas d'erreur visible)
+                $this->logger->warning('featured_summary.display_failed', [
+                    'event' => 'featured_summary.display_failed',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return new Response(
-            $this->renderBriefHtml($viewModel),
+            $this->renderBriefHtml($viewModel, $featuredSummary),
             Response::HTTP_OK,
             ['Content-Type' => 'text/html; charset=UTF-8'],
         );
@@ -126,15 +153,20 @@ final class BriefController
     // ── HTML rendering ─────────────────────────────────────────────────────────
 
     /**
-     * Génère le HTML principal du brief avec les 3 histoires.
+     * Génère le HTML principal du brief avec Featured Summary (US-006) + 3 histoires.
      *
      * Utilise les design tokens CSS (design-tokens.css) inlinés pour Sprint 1.
      * SEO : title, meta description, og:title, og:description, og:url (US-001/T-001-05).
      * Turbo Drive : data-turbo="true" + import Hotwire (US-001 scénario alternatif 2).
      * Liens OUVRIR L'ORIGINAL : rel="noopener noreferrer" (US-001 conversation §6).
      * Invariant INV-2 : accent émeraude (#10B981) réservé exclusivement à l'IA.
+     *
+     * US-006 :
+     * - Section .featured-summary (desktop uniquement — display:none sur mobile)
+     * - id="brief-stories" sur la liste des histoires (ancre CTA)
+     * - CTA "Lire le brief complet" (#brief-stories) dans la nav (sticky)
      */
-    private function renderBriefHtml(DailyBriefViewModel $vm): string
+    private function renderBriefHtml(DailyBriefViewModel $vm, ?FeaturedSummaryDTO $featuredSummary = null): string
     {
         $storiesHtml = '';
 
@@ -146,6 +178,11 @@ final class BriefController
         $metaDescription = "Votre synth\u{00E8}se quotidienne des 3 histoires majeures de l'actualit\u{00E9} tech.";
         $ogUrl = 'https://briefly.ai/brief'; // @TODO: injecter depuis env en Sprint 2
         $lastUpdated = htmlspecialchars($vm->lastUpdatedFormatted, \ENT_QUOTES | \ENT_HTML5);
+
+        $featuredSummaryHtml = $this->renderFeaturedSummary($featuredSummary);
+        $ctaHtml = null !== $featuredSummary
+            ? '<a href="#brief-stories" class="cta-read-brief" aria-label="Lire les 3 histoires du brief">Lire le brief complet</a>'
+            : '';
 
         return <<<HTML
             <!DOCTYPE html>
@@ -164,11 +201,13 @@ final class BriefController
                 {$this->badgeCss()}
                 {$this->summaryCss()}
                 {$this->synthesisCss()}
+                {$this->featuredSummaryCss()}
             </head>
             <body>
                 <header class="site-header" role="banner">
                     <nav class="nav-container" aria-label="Navigation principale">
                         <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
+                        {$ctaHtml}
                     </nav>
                 </header>
 
@@ -181,7 +220,9 @@ final class BriefController
                             </p>
                         </div>
 
-                        <ol class="stories-list" aria-label="Les 3 histoires du jour">
+                        {$featuredSummaryHtml}
+
+                        <ol class="stories-list" id="brief-stories" aria-label="Les 3 histoires du jour">
                             {$storiesHtml}
                         </ol>
                     </div>
@@ -194,6 +235,50 @@ final class BriefController
                 {$this->synthesisJs()}
             </body>
             </html>
+            HTML;
+    }
+
+    /**
+     * Génère le HTML de la section Featured Summary (US-006).
+     *
+     * Cas nominal (isFallback = false) :
+     * - Classe `.featured-summary` (masquage mobile via CSS)
+     * - Badge "BRIEFLY AI:" émeraude (INV-2 — accent émeraude UNIQUEMENT pour l'IA)
+     * - Texte narratif échappé via htmlspecialchars() (OWASP XSS)
+     *
+     * Cas fallback (isFallback = true ou $summary = null) :
+     * - Si null → retourne '' (section absente — pas d'erreur visible)
+     * - Si isFallback → texte sans badge émeraude (INV-2 respecté)
+     *
+     * OWASP XSS : contenu Mistral considéré comme non fiable — toujours échappé.
+     */
+    private function renderFeaturedSummary(?FeaturedSummaryDTO $summary): string
+    {
+        if (null === $summary) {
+            return '';
+        }
+
+        // XSS : échappement systématique du contenu IA (US-006 scénario erreur RGPD)
+        $content = htmlspecialchars($summary->content, \ENT_QUOTES | \ENT_HTML5);
+
+        if ($summary->isFallback) {
+            // Cas fallback : texte sans badge émeraude (INV-2 — pas d'accent émeraude si non-IA)
+            return <<<HTML
+                <section class="featured-summary featured-summary--fallback" aria-label="Synthèse éditoriale du brief">
+                    <p class="featured-summary__text">{$content}</p>
+                </section>
+                HTML;
+        }
+
+        // Cas nominal : badge BRIEFLY AI: émeraude (INV-2)
+        return <<<HTML
+            <section class="featured-summary" aria-label="Synthèse éditoriale du brief">
+                <div class="featured-summary__badge">
+                    <span class="material-symbols-rounded featured-summary__icon" aria-hidden="true">auto_awesome</span>
+                    <span class="ai-summary__badge-text featured-summary__badge-label">BRIEFLY AI:</span>
+                </div>
+                <p class="featured-summary__text">{$content}</p>
+            </section>
             HTML;
     }
 
@@ -1107,6 +1192,95 @@ final class BriefController
               color: var(--color-on-surface-variant);
               border-top: 1px solid var(--color-surface-border);
               margin-top: var(--space-stack-lg);
+            }
+            </style>
+            CSS_BLOCK;
+    }
+
+    /**
+     * CSS spécifique à la section Featured Summary (US-006).
+     *
+     * Responsive :
+     * - MASQUÉE sur mobile (< 768px) — display:none
+     * - Visible uniquement desktop (>= 768px)
+     *
+     * Invariant INV-2 : accent émeraude (#10B981) UNIQUEMENT sur le badge BRIEFLY AI.
+     * Le fallback (.featured-summary--fallback) n'a PAS de bordure émeraude.
+     *
+     * CTA "Lire le brief complet" :
+     * - Collé à droite dans la nav (flex, margin-left: auto)
+     * - Masqué sur mobile (< 768px) — display:none
+     */
+    private function featuredSummaryCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            /* ── Featured Summary (US-006) ────────────────────────────────── */
+            /* Mobile : section masquée */
+            .featured-summary {
+              display: none;
+            }
+            /* Desktop : section visible */
+            @media (min-width: 768px) {
+              .featured-summary {
+                display: block;
+                background-color: var(--color-surface-card);
+                border: 1px solid var(--color-emerald-accent);
+                border-radius: var(--radius);
+                padding: var(--space-stack-md);
+                margin-bottom: var(--space-stack-md);
+              }
+              .featured-summary--fallback {
+                border-color: var(--color-surface-border);
+              }
+            }
+            .featured-summary__badge {
+              display: flex;
+              align-items: center;
+              gap: 0.375rem;
+              margin-bottom: var(--space-stack-sm);
+            }
+            .featured-summary__icon {
+              color: var(--color-emerald-accent);
+              font-size: 1rem;
+              line-height: 1;
+            }
+            .featured-summary__badge-label {
+              font-family: var(--font-meta);
+              font-size: var(--fs-label);
+              letter-spacing: var(--ls-label);
+              color: var(--color-emerald-accent);
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+            .featured-summary__text {
+              font-size: var(--fs-body-md);
+              line-height: var(--lh-body-md);
+              color: var(--color-on-surface);
+            }
+            /* ── CTA "Lire le brief complet" (nav sticky, desktop uniquement) */
+            .cta-read-brief {
+              display: none;
+            }
+            @media (min-width: 768px) {
+              .cta-read-brief {
+                display: inline-block;
+                margin-left: auto;
+                font-family: var(--font-meta);
+                font-size: var(--fs-label);
+                letter-spacing: var(--ls-label);
+                color: var(--color-on-primary);
+                background-color: var(--color-emerald-accent);
+                text-decoration: none;
+                font-weight: 700;
+                text-transform: uppercase;
+                padding: 0.375rem 0.875rem;
+                border-radius: var(--radius);
+                transition: opacity 0.15s ease;
+              }
+              .cta-read-brief:hover {
+                opacity: 0.88;
+              }
             }
             </style>
             CSS_BLOCK;

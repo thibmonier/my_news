@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Application\Brief\GenerateDailyBrief;
 
+use App\Application\Brief\FeaturedSummary\FeaturedSummaryServiceInterface;
+use App\Domain\Brief\BriefPublicViewRepositoryInterface;
 use App\Domain\Brief\BriefSelectorServiceInterface;
+use App\Domain\Brief\DailyBriefRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Lock\Exception\LockStorageException;
@@ -12,10 +15,11 @@ use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Handler Messenger — Orchestre la génération du Daily Brief (US-002 + US-003).
+ * Handler Messenger — Orchestre la génération du Daily Brief (US-002 + US-003 + US-006).
  *
  * Reçoit GenerateDailyBriefMessage, acquiert un lock Redis (anti-doublon),
- * délègue au BriefSelectorService, dispatche BriefGenerationFailedEvent si aucun article.
+ * délègue au BriefSelectorService, dispatche BriefGenerationFailedEvent si aucun article,
+ * puis génère la synthèse narrative Featured Summary (US-006).
  *
  * Lock Redis (US-003/T-003-02) :
  * - Clé : "briefly.daily_brief_generation", TTL 600s
@@ -23,11 +27,12 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * - Redis KO (LockStorageException) → log WARNING + mode dégradé (exécution sans lock)
  *
  * Logging structuré JSON (US-003/T-003-04) :
- * - brief.batch_start    : INFO  au démarrage
- * - brief.batch_success  : INFO  + duration_ms si succès
- * - brief.batch_failed   : ERROR si BriefSelectorService retourne un événement d'échec
+ * - brief.batch_start           : INFO  au démarrage
+ * - brief.batch_success         : INFO  + duration_ms si succès
+ * - brief.batch_failed          : ERROR si BriefSelectorService retourne un événement d'échec
  * - brief.lock_already_acquired : INFO si lock non acquis (doublon détecté → skip)
- * - brief.lock_unavailable : WARNING si Redis KO (mode dégradé)
+ * - brief.lock_unavailable      : WARNING si Redis KO (mode dégradé)
+ * - featured_summary.generation_failed : WARNING si FeaturedSummaryService KO (non-bloquant)
  *
  * Retry : Messenger gère les retries (max 3 tentatives, backoff exponentiel 5 min, 10 min, 20 min).
  * Les exceptions techniques (timeout DB, etc.) se propagent pour déclencher le retry.
@@ -48,6 +53,9 @@ final class GenerateDailyBriefHandler
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
         private readonly LockFactory $lockFactory,
+        private readonly FeaturedSummaryServiceInterface $featuredSummaryService,
+        private readonly DailyBriefRepositoryInterface $dailyBriefRepository,
+        private readonly BriefPublicViewRepositoryInterface $briefPublicViewRepository,
     ) {
     }
 
@@ -115,6 +123,28 @@ final class GenerateDailyBriefHandler
                 ]);
 
                 return;
+            }
+
+            // ── US-006 : Génération du Featured Summary après sélection des stories ─
+            try {
+                $dailyBrief = $this->dailyBriefRepository->findForDate($date);
+                $publicView = $this->briefPublicViewRepository->findLatestPublicView();
+
+                if (null !== $dailyBrief && null !== $publicView && [] !== $publicView->stories) {
+                    $this->featuredSummaryService->generateForBrief(
+                        briefId: $dailyBrief->getId(),
+                        date: $date,
+                        stories: $publicView->stories,
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Non-bloquant : une erreur sur le Featured Summary ne doit pas
+                // annuler la génération du brief principal (US-006 scénario fallback)
+                $this->logger->warning('featured_summary.generation_failed', [
+                    'event' => 'featured_summary.generation_failed',
+                    'date' => $date->format('Y-m-d'),
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             $durationMs = (int) ((microtime(true) - $startTime) * 1000);
