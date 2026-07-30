@@ -9,7 +9,7 @@
 | **Persona** | P-001 Thomas — Cadre dirigeant tech, 38 ans |
 | **Story Points** | 3 (Fibonacci) |
 | **Priorité MoSCoW** | Must Have |
-| **Sprint** | backlog |
+| **Sprint** | sprint-003-consolidation |
 
 **Dépend de :** US-010 (SynthesisService), US-011 (clé de cache par niveau)
 

@@ -9,7 +9,7 @@
 | Persona | P-002 Priya, chercheuse en stratégie |
 | Story Points | 3 |
 | Priorité MoSCoW | Should Have |
-| Sprint | backlog |
+| Sprint | sprint-003-consolidation |
 
 ---
 
