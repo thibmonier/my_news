@@ -79,6 +79,21 @@ security:
         - { path: ^/quota/paywall-modal, roles: ROLE_USER }  # US-033 : paywall modal authentifié
         - { path: ^/api/v1, roles: PUBLIC_ACCESS }           # API Platform — voters sur chaque opération
 
+when@dev:
+    security:
+        # Admin de développement pour accéder au back-office /admin en local.
+        # Identifiants : admin / admin (le password ci-dessous est le hash argon2id de "admin").
+        # On stocke le hash (pas de plaintext) pour que le hasher sodium par défaut le vérifie —
+        # évite le piège d'ordre de résolution des hashers (InMemoryUser instanceof
+        # PasswordAuthenticatedUserInterface). N'existe qu'en APP_ENV=dev — aucun impact prod/test.
+        providers:
+            users_in_memory:
+                memory:
+                    users:
+                        admin:
+                            password: '$argon2id$v=19$m=65536,t=4,p=1$D2cVTbnc18yNgX2Z07W63w$Tf1yfO5XgcnA4mY85Lh07K9J764xt79teNYmvxoS5tA'
+                            roles: ['ROLE_ADMIN']
+
 when@test:
     security:
         password_hashers:
