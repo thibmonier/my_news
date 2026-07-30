@@ -10,6 +10,7 @@ use App\Domain\Quota\QuotaServiceUnavailableException;
 use App\Domain\Synthesis\InvalidSynthesisUrlException;
 use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisResponse;
+use App\Domain\Synthesis\SynthesisResponseWithCacheStatus;
 use App\Domain\Synthesis\SynthesisServiceInterface;
 use App\Domain\Synthesis\SynthesisUnavailableException;
 use App\Presentation\ApiResource\SynthesisResource;
@@ -78,15 +79,17 @@ function urlUuidResolverStub(?string $uuid): UserUuidResolverInterface
 function synthesisServiceStub(
     bool $throwInvalid = false,
     bool $throwUnavailable = false,
+    string $cacheStatus = SynthesisResponseWithCacheStatus::MISS,
 ): SynthesisServiceInterface {
-    return new class($throwInvalid, $throwUnavailable) implements SynthesisServiceInterface {
+    return new class($throwInvalid, $throwUnavailable, $cacheStatus) implements SynthesisServiceInterface {
         public function __construct(
             private readonly bool $throwInvalid,
             private readonly bool $throwUnavailable,
+            private readonly string $cacheStatus,
         ) {
         }
 
-        public function synthesize(SynthesisRequest $request): SynthesisResponse
+        public function synthesize(SynthesisRequest $request): SynthesisResponseWithCacheStatus
         {
             if ($this->throwInvalid) {
                 throw new InvalidSynthesisUrlException('URL invalide');
@@ -96,13 +99,15 @@ function synthesisServiceStub(
                 throw new SynthesisUnavailableException('mock Mistral KO');
             }
 
-            return new SynthesisResponse(
+            $response = new SynthesisResponse(
                 content: 'BRIEFLY AI: Test synthesis content for the article.',
                 keyPoints: ['01 First point', '02 Second point', '03 Third point'],
                 sources: ['Test Source'],
                 originalUrl: $request->url,
                 isPartial: false,
             );
+
+            return new SynthesisResponseWithCacheStatus($response, $this->cacheStatus);
         }
     };
 }
@@ -293,4 +298,66 @@ test('process lève AccessDeniedException si utilisateur non authentifié', func
         inputResourceWithUrl('https://example.com/article'),
         urlSynthesisOperation(),
     ))->toThrow(AccessDeniedException::class);
+});
+
+// ── Header X-Cache (US-012) ───────────────────────────────────────────────────
+
+test('process stocke X-Cache=MISS dans les attributs de la requête si cache miss', function (): void {
+    $processor = makeUrlSynthesisProcessor(
+        synthesisServiceStub(cacheStatus: SynthesisResponseWithCacheStatus::MISS),
+    );
+
+    $request = Symfony\Component\HttpFoundation\Request::create('/api/v1/synthesis', 'POST');
+
+    $processor->process(
+        inputResourceWithUrl('https://example.com/article'),
+        urlSynthesisOperation(),
+        context: ['request' => $request],
+    );
+
+    expect($request->attributes->get('synthesis_x_cache'))->toBe('MISS');
+});
+
+test('process stocke X-Cache=HIT dans les attributs de la requête si cache hit', function (): void {
+    $processor = makeUrlSynthesisProcessor(
+        synthesisServiceStub(cacheStatus: SynthesisResponseWithCacheStatus::HIT),
+    );
+
+    $request = Symfony\Component\HttpFoundation\Request::create('/api/v1/synthesis', 'POST');
+
+    $processor->process(
+        inputResourceWithUrl('https://example.com/article'),
+        urlSynthesisOperation(),
+        context: ['request' => $request],
+    );
+
+    expect($request->attributes->get('synthesis_x_cache'))->toBe('HIT');
+});
+
+test('process stocke X-Cache=BYPASS dans les attributs de la requête si Redis indisponible', function (): void {
+    $processor = makeUrlSynthesisProcessor(
+        synthesisServiceStub(cacheStatus: SynthesisResponseWithCacheStatus::BYPASS),
+    );
+
+    $request = Symfony\Component\HttpFoundation\Request::create('/api/v1/synthesis', 'POST');
+
+    $processor->process(
+        inputResourceWithUrl('https://example.com/article'),
+        urlSynthesisOperation(),
+        context: ['request' => $request],
+    );
+
+    expect($request->attributes->get('synthesis_x_cache'))->toBe('BYPASS');
+});
+
+test('process fonctionne sans request dans le context (pas d\'attribut X-Cache)', function (): void {
+    $processor = makeUrlSynthesisProcessor(synthesisServiceStub());
+
+    // Sans context['request'], aucune exception ne doit être levée
+    $result = $processor->process(
+        inputResourceWithUrl('https://example.com/article'),
+        urlSynthesisOperation(),
+    );
+
+    expect($result)->toBeInstanceOf(SynthesisResource::class);
 });

@@ -309,9 +309,9 @@ test('cache miss sur même URL + niveau différent → appel Mistral distinct', 
 test('le service fonctionne sans injection de cache (rétrocompatibilité)', function (): void {
     $service = makeLevelService(levelMistralStub(), levelContentFetcherStub(), levelRepositoryStub());
 
-    $response = $service->synthesize(new SynthesisRequest('https://example.com/article'));
+    $result = $service->synthesize(new SynthesisRequest('https://example.com/article'));
 
-    expect($response->content)->toStartWith('BRIEFLY AI:');
+    expect($result->response->content)->toStartWith('BRIEFLY AI:');
 });
 
 // ── PII-free ──────────────────────────────────────────────────────────────────

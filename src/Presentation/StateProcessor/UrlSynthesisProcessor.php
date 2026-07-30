@@ -16,7 +16,9 @@ use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisServiceInterface;
 use App\Domain\Synthesis\SynthesisUnavailableException;
 use App\Presentation\ApiResource\SynthesisResource;
+use App\Presentation\EventSubscriber\SynthesisCacheHeaderSubscriber;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -125,9 +127,9 @@ final class UrlSynthesisProcessor implements ProcessorInterface
             throw new TooManyRequestsHttpException(retryAfter: null, message: 'Vous avez utilisé vos 3 synthèses gratuites aujourd\'hui.', code: 0, headers: ['X-Quota-Remaining' => '0']);
         }
 
-        // ── 5. Synthèse IA (SSRF + fetch + Mistral + persistence) ──────────
+        // ── 5. Synthèse IA (normalisation + SSRF + cache + Mistral + persistence) ──
         try {
-            $response = $this->synthesisService->synthesize(new SynthesisRequest($url, $level));
+            $synthesisResult = $this->synthesisService->synthesize(new SynthesisRequest($url, $level));
         } catch (InvalidSynthesisUrlException $e) {
             throw new UnprocessableEntityHttpException('URL invalide — vérifiez le format de l\'adresse', $e);
         } catch (SynthesisUnavailableException $e) {
@@ -145,6 +147,22 @@ final class UrlSynthesisProcessor implements ProcessorInterface
                 : 'Service temporairement indisponible — réessayez dans quelques instants.';
 
             throw new ServiceUnavailableHttpException(retryAfter: null, message: $message, previous: $e);
+        }
+
+        $response = $synthesisResult->response;
+        $cacheStatus = $synthesisResult->cacheStatus;
+
+        // ── 5b. Header X-Cache (HIT|MISS|BYPASS) via attribut de requête ────
+        // Le subscriber SynthesisCacheHeaderSubscriber lit cet attribut sur kernel.response
+        // et injecte le header HTTP correspondant dans la réponse (US-012 T-012-04).
+        /** @var Request|null $currentRequest */
+        $currentRequest = $context['request'] ?? null;
+
+        if ($currentRequest instanceof Request) {
+            $currentRequest->attributes->set(
+                SynthesisCacheHeaderSubscriber::REQUEST_ATTRIBUTE,
+                $cacheStatus,
+            );
         }
 
         // ── 6. Quota courant post-consommation ──────────────────────────────
