@@ -202,8 +202,18 @@ final class BriefController
                 {$this->summaryCss()}
                 {$this->synthesisCss()}
                 {$this->featuredSummaryCss()}
+                {$this->progressBarCss()}
             </head>
             <body>
+                <div
+                    data-controller="progress-bar"
+                    role="progressbar"
+                    aria-valuenow="0"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    class="progress-bar"
+                    style="width:0%"
+                ></div>
                 <header class="site-header" role="banner">
                     <nav class="nav-container" aria-label="Navigation principale">
                         <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
@@ -233,6 +243,7 @@ final class BriefController
                 </footer>
 
                 {$this->synthesisJs()}
+                {$this->progressBarJs()}
             </body>
             </html>
             HTML;
@@ -1045,6 +1056,111 @@ final class BriefController
             }
             </style>
             CSS_BLOCK;
+    }
+
+    /**
+     * CSS de la barre de progression de lecture (US-007).
+     *
+     * Barre fixée en haut du viewport (position: fixed, top: 0), hauteur 2px,
+     * couleur émeraude via token CSS (INV-2 — accent émeraude réservé à l'IA/progression).
+     * Transition douce 0.1s pour un rendu fluide au scroll.
+     * z-index: 100 — passe au-dessus du header (z-index 10) sans cacher le contenu.
+     *
+     * Dark mode : même couleur émeraude (token partagé, INV-2 respecté).
+     */
+    private function progressBarCss(): string
+    {
+        return <<<'CSS_BLOCK'
+            <style>
+            /* ── Barre de progression de lecture (US-007) ────────────────────────── */
+            .progress-bar {
+              position: fixed;
+              top: 0;
+              left: 0;
+              height: 2px;
+              width: 0%;
+              background: var(--color-emerald-accent, #10B981);
+              z-index: 100;
+              transition: width 0.1s linear;
+              /* ARIA progressbar : élément sémantique, couleur non exclusive (WCAG 2.1 AA) */
+            }
+            /* Dark mode : émeraude conservé (INV-2) */
+            @media (prefers-color-scheme: dark) {
+              :root:not([data-theme="light"]) .progress-bar {
+                background: var(--color-emerald-accent, #10B981);
+              }
+            }
+            </style>
+            CSS_BLOCK;
+    }
+
+    /**
+     * Script JS inline de la barre de progression de lecture (US-007).
+     *
+     * Implémente le comportement du Stimulus controller `progress-bar_controller.js`
+     * en JavaScript vanilla, le temps que Symfony AssetMapper soit activé (Sprint 2+).
+     * L'élément `data-controller="progress-bar"` sera alors pris en charge nativement
+     * par le bundle Stimulus Bridge.
+     *
+     * Logique :
+     * - Écoute scroll (passive) + throttle requestAnimationFrame (~50ms)
+     * - pct = scrollTop / (scrollHeight - innerHeight) × 100, borné 0-100
+     * - Cas division par zéro (page non-scrollable) → width = 100%
+     * - Reset à 0% sur événement turbo:load (navigation Turbo Drive sans rechargement)
+     * - Aucune erreur NaN/Infinity (WCAG 2.1 AA + scénario erreur 2 US-007)
+     */
+    private function progressBarJs(): string
+    {
+        return <<<'JS_BLOCK'
+            <script>
+            (function () {
+              var bar = document.querySelector('[data-controller="progress-bar"]');
+              if (!bar) return;
+
+              var rafId = null;
+              var lastRun = 0;
+              var THROTTLE_MS = 50;
+
+              function update() {
+                var scrollTop = window.scrollY !== undefined ? window.scrollY : document.documentElement.scrollTop;
+                var maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+
+                var pct;
+                if (maxScroll <= 0) {
+                  // Page non-scrollable : contenu tenant dans le viewport → 100%
+                  pct = 100;
+                } else {
+                  pct = Math.round(Math.min(100, Math.max(0, (scrollTop / maxScroll) * 100)));
+                }
+
+                bar.style.width = pct + '%';
+                bar.setAttribute('aria-valuenow', String(pct));
+              }
+
+              function onScroll() {
+                var now = Date.now();
+                if (now - lastRun < THROTTLE_MS) return;
+                if (rafId !== null) return;
+                rafId = requestAnimationFrame(function () {
+                  rafId = null;
+                  lastRun = Date.now();
+                  update();
+                });
+              }
+
+              function onTurboLoad() {
+                bar.style.width = '0%';
+                bar.setAttribute('aria-valuenow', '0');
+              }
+
+              // Calcul initial
+              update();
+
+              document.addEventListener('scroll', onScroll, { passive: true });
+              document.addEventListener('turbo:load', onTurboLoad);
+            })();
+            </script>
+            JS_BLOCK;
     }
 
     /**
