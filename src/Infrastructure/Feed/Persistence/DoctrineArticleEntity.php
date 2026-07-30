@@ -65,6 +65,37 @@ class DoctrineArticleEntity
     #[ORM\Column(length: 50, options: ['default' => 'productivity'])]
     private string $category = 'productivity';
 
+    /**
+     * SimHash 64 bits du titre normalisé (US-022).
+     *
+     * NULL si le titre est vide, réduit à des stopwords uniquement,
+     * ou si le calcul SimHash a échoué.
+     *
+     * Doctrine bigint → string PHP (compatibilité 32/64 bits).
+     */
+    #[ORM\Column(type: 'bigint', nullable: true, name: 'title_simhash')]
+    // @phpstan-ignore-next-line property.unusedType (Doctrine hydrate en string via reflection)
+    private ?string $titleSimhash = null;
+
+    /**
+     * Vrai si cet article est un doublon sémantique d'un article déjà indexé (US-022).
+     *
+     * Les doublons sont CONSERVÉS en base (traçabilité) mais exclus du Daily Brief.
+     */
+    #[ORM\Column(name: 'is_duplicate', options: ['default' => false])]
+    private bool $isDuplicate = false;
+
+    /**
+     * Référence self-référentielle vers l'article original (US-022).
+     *
+     * ON DELETE SET NULL : la traçabilité est préservée si l'original est supprimé.
+     * NULL si l'article n'est pas un doublon.
+     */
+    #[ORM\ManyToOne(targetEntity: self::class)]
+    #[ORM\JoinColumn(name: 'duplicate_of', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    // @phpstan-ignore-next-line property.unusedType (Doctrine hydrate via ORM reflection)
+    private ?self $duplicateOf = null;
+
     public function __construct(
         Uuid $id,
         Uuid $sourceId,
@@ -142,5 +173,23 @@ class DoctrineArticleEntity
     public function getCategory(): string
     {
         return $this->category;
+    }
+
+    /** SimHash 64 bits du titre (null si non calculé). Doctrine bigint → string. */
+    public function getTitleSimhash(): ?string
+    {
+        return $this->titleSimhash;
+    }
+
+    /** Vrai si l'article est marqué comme doublon sémantique (US-022). */
+    public function isDuplicate(): bool
+    {
+        return $this->isDuplicate;
+    }
+
+    /** Article original dont celui-ci est le doublon (null si non-doublon). */
+    public function getDuplicateOf(): ?self
+    {
+        return $this->duplicateOf;
     }
 }

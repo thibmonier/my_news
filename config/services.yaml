@@ -3,6 +3,10 @@
 ## Architecture hexagonale : Domain/Application/Infrastructure/Presentation.
 
 parameters:
+    # US-022 — Seuil de distance de Hamming pour la déduplication SimHash.
+    # Un article avec distance(simhash_a, simhash_b) <= seuil est considéré doublon.
+    # Plage valide : 1–10 (validation dans SimHashService). Défaut : 3 bits sur 64.
+    briefly.simhash.threshold: 3
 
 services:
     # ── Defaults ──────────────────────────────────────────────────────────────
@@ -73,6 +77,15 @@ services:
 
     App\Domain\Feed\SourceFetcherInterface:
         alias: App\Infrastructure\Feed\Fetcher\FeedIoSourceFetcher
+
+    # ── SimHash (US-022) — Déduplication sémantique par titre ────────────────
+    App\Domain\Feed\SimHashServiceInterface:
+        alias: App\Infrastructure\Feed\SimHash\SimHashService
+
+    # FetchSourceHandler : injection du seuil SimHash (scalaire, pas autowirable)
+    App\Application\Feed\FetchSource\FetchSourceHandler:
+        arguments:
+            $simhashThreshold: '%briefly.simhash.threshold%'
 
     # ── User (US-030) — Domain ports → Infrastructure adapters ────────────────
     App\Domain\User\UserRepositoryInterface:

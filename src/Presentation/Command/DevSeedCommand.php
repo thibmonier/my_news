@@ -229,7 +229,7 @@ final class DevSeedCommand extends Command
                 $inserted = $this->articleRepository->saveIgnoringDuplicate($dto);
                 $io->writeln(\sprintf(
                     '  %s [DEMO] %s',
-                    $inserted ? '✓ inséré' : '→ déjà présent',
+                    null !== $inserted ? '✓ inséré' : '→ déjà présent',
                     $demo['title'],
                 ));
             }
