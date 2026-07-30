@@ -136,7 +136,8 @@ test('synthesize retourne une SynthesisResponse avec préfixe "BRIEFLY AI:" pour
         repository: repositoryStub(),
     );
 
-    $response = $service->synthesize(new SynthesisRequest('https://example.com/article'));
+    $result = $service->synthesize(new SynthesisRequest('https://example.com/article'));
+    $response = $result->response;
 
     expect($response->content)->toStartWith('BRIEFLY AI:');
     expect($response->originalUrl)->toBe('https://example.com/article');
@@ -150,7 +151,8 @@ test('synthesize retourne exactement 3 points clés numérotés 01/02/03', funct
         repository: repositoryStub(),
     );
 
-    $response = $service->synthesize(new SynthesisRequest('https://example.com/article'));
+    $result = $service->synthesize(new SynthesisRequest('https://example.com/article'));
+    $response = $result->response;
 
     expect($response->keyPoints)->toHaveCount(3);
     expect($response->keyPoints[0])->toStartWith('01');
@@ -165,9 +167,9 @@ test('synthesize retourne au moins une source', function (): void {
         repository: repositoryStub(),
     );
 
-    $response = $service->synthesize(new SynthesisRequest('https://example.com/article'));
+    $result = $service->synthesize(new SynthesisRequest('https://example.com/article'));
 
-    expect($response->sources)->not->toBeEmpty();
+    expect($result->response->sources)->not->toBeEmpty();
 });
 
 test('synthesize persiste le résultat avec url_hash SHA-256', function (): void {
@@ -197,7 +199,8 @@ test('synthesize retourne isPartial=true quand le fetcher signale un paywall', f
         repository: repositoryStub(),
     );
 
-    $response = $service->synthesize(new SynthesisRequest('https://example.com/paywalled'));
+    $result = $service->synthesize(new SynthesisRequest('https://example.com/paywalled'));
+    $response = $result->response;
 
     expect($response->isPartial)->toBeTrue();
     expect($response->content)->toContain('Contenu partiel');
@@ -210,9 +213,9 @@ test('synthesize retourne toujours "BRIEFLY AI:" même avec contenu partiel', fu
         repository: repositoryStub(),
     );
 
-    $response = $service->synthesize(new SynthesisRequest('https://example.com/paywalled'));
+    $result = $service->synthesize(new SynthesisRequest('https://example.com/paywalled'));
 
-    expect($response->content)->toStartWith('BRIEFLY AI:');
+    expect($result->response->content)->toStartWith('BRIEFLY AI:');
 });
 
 // ── Scénario erreur 1 — URL invalide / SSRF ───────────────────────────────────

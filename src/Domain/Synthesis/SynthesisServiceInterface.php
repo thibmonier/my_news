@@ -20,18 +20,22 @@ interface SynthesisServiceInterface
      * Génère une synthèse IA pour l'URL fournie.
      *
      * Flux :
-     * 1. Validation SSRF de l'URL (rejet IP RFC1918 + schéma http/https)
-     * 2. Fetch du contenu de l'article
-     * 3. Appel MistralClientInterface (prompt contrôlé ~200 mots, 3 points clés, sources)
-     * 4. Parse de la réponse Mistral
-     * 5. Persistence SynthesisResult
+     * 1. Normalisation de l'URL (lowercase, tri query params, suppression fragment) — US-012
+     * 2. Validation SSRF de l'URL normalisée (rejet IP RFC1918 + schéma http/https)
+     * 3. Vérification cache Redis (clé sha256(normalizedUrl . '_' . level))
+     * 4. Fetch du contenu de l'article
+     * 5. Appel MistralClientInterface (prompt contrôlé ~200 mots, 3 points clés, sources)
+     * 6. Parse de la réponse Mistral
+     * 7. Persistence SynthesisResult
+     * 8. Mise en cache Redis (sauf si Redis indisponible — BYPASS)
      *
      * @param SynthesisRequest $request URL source de l'article à synthétiser
      *
-     * @throws InvalidSynthesisUrlException si l'URL est malformée ou cible une IP privée (SSRF)
+     * @throws InvalidSynthesisUrlException si l'URL est malformée, contient des caractères
+     *                                      de contrôle, ou cible une IP privée (SSRF)
      * @throws SynthesisUnavailableException si Mistral est inaccessible (timeout, erreur réseau)
      *
-     * @return SynthesisResponse Synthèse IA avec content, keyPoints, sources, originalUrl, isPartial
+     * @return SynthesisResponseWithCacheStatus Synthèse avec statut cache HIT|MISS|BYPASS (US-012)
      */
-    public function synthesize(SynthesisRequest $request): SynthesisResponse;
+    public function synthesize(SynthesisRequest $request): SynthesisResponseWithCacheStatus;
 }

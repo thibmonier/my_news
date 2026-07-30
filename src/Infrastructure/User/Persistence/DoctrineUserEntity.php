@@ -7,6 +7,7 @@ namespace App\Infrastructure\User\Persistence;
 use App\Domain\User\Email;
 use App\Domain\User\IdentifiableUserInterface;
 use App\Domain\User\User;
+use App\Domain\User\UserProfileInterface;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -28,7 +29,7 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
-class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInterface, IdentifiableUserInterface
+class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInterface, IdentifiableUserInterface, UserProfileInterface
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -55,6 +56,18 @@ class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInte
     #[ORM\Column(name: 'consent_at')]
     private \DateTimeImmutable $consentAt;
 
+    #[ORM\Column(length: 280, nullable: true)]
+    private ?string $bio = null;
+
+    #[ORM\Column(name: 'email_pending', length: 255, nullable: true)]
+    private ?string $emailPending = null;
+
+    #[ORM\Column(name: 'email_pending_token', length: 36, nullable: true)]
+    private ?string $emailPendingToken = null;
+
+    #[ORM\Column(name: 'email_pending_expires_at', type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $emailPendingExpiresAt = null;
+
     /**
      * @param list<string> $roles
      */
@@ -66,6 +79,10 @@ class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInte
         \DateTimeImmutable $createdAt,
         \DateTimeImmutable $consentAt,
         array $roles = ['ROLE_USER'],
+        ?string $bio = null,
+        ?string $emailPending = null,
+        ?string $emailPendingToken = null,
+        ?\DateTimeImmutable $emailPendingExpiresAt = null,
     ) {
         $this->id = $id;
         $this->email = $email;
@@ -75,6 +92,10 @@ class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInte
         $this->consentAt = $consentAt;
         /* @var list<string> $roles */
         $this->roles = $roles;
+        $this->bio = $bio;
+        $this->emailPending = $emailPending;
+        $this->emailPendingToken = $emailPendingToken;
+        $this->emailPendingExpiresAt = $emailPendingExpiresAt;
     }
 
     // ── Factories ──────────────────────────────────────────────────────────────
@@ -92,6 +113,10 @@ class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInte
             createdAt: $user->getCreatedAt(),
             consentAt: $user->getConsentAt(),
             roles: $user->getRoles(),
+            bio: $user->getBio(),
+            emailPending: $user->getEmailPending(),
+            emailPendingToken: $user->getEmailPendingToken(),
+            emailPendingExpiresAt: $user->getEmailPendingExpiresAt(),
         );
     }
 
@@ -171,6 +196,26 @@ class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInte
         return $this->consentAt;
     }
 
+    public function getBio(): ?string
+    {
+        return $this->bio;
+    }
+
+    public function getEmailPending(): ?string
+    {
+        return $this->emailPending;
+    }
+
+    public function getEmailPendingToken(): ?string
+    {
+        return $this->emailPendingToken;
+    }
+
+    public function getEmailPendingExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->emailPendingExpiresAt;
+    }
+
     // ── Anti-corruption layer ──────────────────────────────────────────────────
 
     /**
@@ -186,6 +231,10 @@ class DoctrineUserEntity implements UserInterface, PasswordAuthenticatedUserInte
             createdAt: $this->createdAt,
             consentAt: $this->consentAt,
             roles: $this->roles,
+            bio: $this->bio,
+            emailPending: $this->emailPending,
+            emailPendingToken: $this->emailPendingToken,
+            emailPendingExpiresAt: $this->emailPendingExpiresAt,
         );
     }
 }

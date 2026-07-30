@@ -2,7 +2,7 @@
 project: briefly-ai
 track: enterprise
 initialized_at: 2026-07-28T00:00:00Z
-current_phase: sprint-2-start
+current_phase: sprint-3-start
 
 backlog_frozen:
   personas: "P-004 Sophie (Admin) ajouté — corrige US-021 INVEST V"
@@ -109,5 +109,24 @@ sprint_2:
     - US-021  # CRUD sources RSS admin (5 pts)
     - US-031  # OAuth Google/GitHub (5 pts)
 
-next_action: "Sprint 2 démarré — lancer /project:decompose-tasks 002 pour la Part 2 du Sprint Planning"
-next_command: "/project:decompose-tasks 002"
+sprint_3:
+  status: start
+  sprint: sprint-003-consolidation
+  dates: "2026-08-25 → 2026-09-07"
+  points: 16
+  stories:
+    - US-022  # Déduplication SimHash (3 pts)
+    - US-032  # Profil utilisateur (3 pts)
+    - US-012  # Cache Redis synthèses (3 pts)
+    - US-006  # Featured Summary + CTA (5 pts)
+    - US-007  # Indicateur progression lecture (2 pts)
+  infra_transverse:
+    - "Déblocage CI GitHub Actions (billing)"
+    - "Provisioning admin prod (ROLE_ADMIN)"
+    - "Déploiement environnement staging"
+    - "Instrumentation analytics rétention J+1/J+7 (0 PII RGPD)"
+    - "Monitoring quota Mistral (alerte < 20%)"
+    - "Garde-fou charge Docker (limites mémoire/CPU)"
+
+next_action: "Sprint 3 démarré — lancer /project:decompose-tasks 003 pour la Part 2 du Sprint Planning"
+next_command: "/project:decompose-tasks 003"

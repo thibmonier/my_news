@@ -3,6 +3,10 @@
 ## Architecture hexagonale : Domain/Application/Infrastructure/Presentation.
 
 parameters:
+    # US-022 — Seuil de distance de Hamming pour la déduplication SimHash.
+    # Un article avec distance(simhash_a, simhash_b) <= seuil est considéré doublon.
+    # Plage valide : 1–10 (validation dans SimHashService). Défaut : 3 bits sur 64.
+    briefly.simhash.threshold: 3
 
 services:
     # ── Defaults ──────────────────────────────────────────────────────────────
@@ -73,6 +77,15 @@ services:
 
     App\Domain\Feed\SourceFetcherInterface:
         alias: App\Infrastructure\Feed\Fetcher\FeedIoSourceFetcher
+
+    # ── SimHash (US-022) — Déduplication sémantique par titre ────────────────
+    App\Domain\Feed\SimHashServiceInterface:
+        alias: App\Infrastructure\Feed\SimHash\SimHashService
+
+    # FetchSourceHandler : injection du seuil SimHash (scalaire, pas autowirable)
+    App\Application\Feed\FetchSource\FetchSourceHandler:
+        arguments:
+            $simhashThreshold: '%briefly.simhash.threshold%'
 
     # ── User (US-030) — Domain ports → Infrastructure adapters ────────────────
     App\Domain\User\UserRepositoryInterface:
@@ -196,3 +209,21 @@ services:
         arguments:
             $mistralClient: '@App\Infrastructure\Summary\Ai\MistralSummaryClient'
             $openAiClient: '@App\Infrastructure\Summary\Ai\OpenAiSummaryClient'
+
+    # ── US-006 : Featured Summary desktop ───────────────────────────────────────
+
+    # Application service port → implementation
+    App\Application\Brief\FeaturedSummary\FeaturedSummaryServiceInterface:
+        alias: App\Application\Brief\FeaturedSummary\FeaturedSummaryService
+
+    # Domain ports → Infrastructure adapters
+    App\Domain\Brief\DailyBriefSummaryRepositoryInterface:
+        alias: App\Infrastructure\Brief\Persistence\DoctrineDailyBriefSummaryRepository
+
+    App\Domain\Brief\FeaturedSummaryCacheInterface:
+        alias: App\Infrastructure\Brief\Cache\RedisFeaturedSummaryCache
+
+    # RedisFeaturedSummaryCache : réutilise cache.synthesis (même pool Redis, TTL 24h)
+    App\Infrastructure\Brief\Cache\RedisFeaturedSummaryCache:
+        arguments:
+            $synthesisPool: '@cache.synthesis'

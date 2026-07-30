@@ -8,6 +8,7 @@ use App\Domain\Feed\ArticleDTO;
 use App\Domain\Feed\ArticleRepositoryInterface;
 use App\Domain\Feed\ContentHash;
 use App\Domain\Feed\FeedType;
+use App\Domain\Feed\SimHashServiceInterface;
 use App\Domain\Feed\Source;
 use App\Domain\Feed\SourceFetcherInterface;
 use App\Domain\Feed\SourceRepositoryInterface;
@@ -19,10 +20,14 @@ use Psr\Log\NullLogger;
  *
  * Couvre les scénarios Gherkin US-020 :
  * - Nominal : articles parsés et insérés, last_fetched_at mis à jour
- * - Doublon : saveIgnoringDuplicate retourne false (x2), count inchangé, pas d'exception
+ * - Doublon : saveIgnoringDuplicate retourne null (x2), count inchangé, pas d'exception
  * - HTTP 5xx / XML invalide : exception catchée, last_error_at mis à jour, worker libéré
  * - Source introuvable : log warning, pas d'exception
  * - Flux vide : last_fetched_at mis à jour quand même
+ *
+ * US-022 : SimHashService stub retourne null → aucun traitement SimHash dans ces tests.
+ * Les tests SimHash sont dans Unit/Infrastructure/Feed/SimHashServiceTest.php
+ * et Feature/Feed/SimHashDeduplicationTest.php.
  *
  * Utilise des stubs PHP anonymes (pas de Mockery/ProphecX).
  */
@@ -151,6 +156,8 @@ function fetcherStub(array|Throwable $returnValue): SourceFetcherInterface
  * Crée un ArticleRepositoryInterface stub qui compte les insertions.
  *
  * @param array<int, bool> $saveResults séquence de résultats pour saveIgnoringDuplicate
+ *                                      true → retourne UUID (article inséré)
+ *                                      false → retourne null (doublon SHA-256)
  */
 function articleRepoStub(array $saveResults = []): ArticleRepositoryInterface
 {
@@ -162,15 +169,30 @@ function articleRepoStub(array $saveResults = []): ArticleRepositoryInterface
         {
         }
 
-        public function saveIgnoringDuplicate(ArticleDTO $dto): bool
+        public function saveIgnoringDuplicate(ArticleDTO $dto): ?string
         {
             $result = $this->results[$this->callIndex++] ?? true;
 
             if ($result) {
                 ++$this->inserted;
+
+                return 'aaaaaaaa-bbbb-cccc-dddd-' . str_pad((string) $this->inserted, 12, '0', \STR_PAD_LEFT);
             }
 
-            return $result;
+            return null;
+        }
+
+        public function findPotentialDuplicates(int $simhash, DateTimeImmutable $publishedAt, int $threshold): array
+        {
+            return [];
+        }
+
+        public function markAsDuplicate(string $articleId, int $simhash, string $duplicateOfId): void
+        {
+        }
+
+        public function updateTitleSimHash(string $articleId, int $simhash): void
+        {
         }
 
         public function findPaginatedWithSourceName(int $page, int $perPage): array
@@ -190,6 +212,43 @@ function articleRepoStub(array $saveResults = []): ArticleRepositoryInterface
     };
 }
 
+/**
+ * Crée un SimHashServiceInterface stub qui retourne null pour compute().
+ *
+ * Retourner null → le handler logue WARNING et ne tente aucune recherche de doublon.
+ * Adapté pour les tests unitaires US-020 qui ne couvrent pas le comportement SimHash.
+ */
+function simHashStub(): SimHashServiceInterface
+{
+    return new class implements SimHashServiceInterface {
+        public function compute(string $title): ?int
+        {
+            return null; // Pas de SimHash dans les tests unitaires US-020
+        }
+
+        public function distance(int $a, int $b): int
+        {
+            return 0;
+        }
+    };
+}
+
+/** Construit le handler avec tous les stubs nécessaires (US-020 + US-022). */
+function makeHandler(
+    SourceRepositoryInterface $sourceRepo,
+    SourceFetcherInterface $fetcher,
+    ArticleRepositoryInterface $articleRepo,
+): FetchSourceHandler {
+    return new FetchSourceHandler(
+        $sourceRepo,
+        $fetcher,
+        $articleRepo,
+        new NullLogger(),
+        simHashStub(),
+        simhashThreshold: 3,
+    );
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 test('handler insère les articles et met à jour last_fetched_at (nominal)', function (): void {
@@ -199,20 +258,20 @@ test('handler insère les articles et met à jour last_fetched_at (nominal)', fu
     $fetcher = fetcherStub([sampleDto('src-001', 'a'), sampleDto('src-001', 'b')]);
     $articleRepo = articleRepoStub([true, true]);
 
-    $handler = new FetchSourceHandler($sourceRepo, $fetcher, $articleRepo, new NullLogger());
+    $handler = makeHandler($sourceRepo, $fetcher, $articleRepo);
     $handler(new FetchSourceMessage('src-001'));
 
     expect($lastFetchedAt)->toBeInstanceOf(DateTimeImmutable::class);
 });
 
-test('handler gère les doublons (saveIgnoringDuplicate → false) sans exception', function (): void {
+test('handler gère les doublons (saveIgnoringDuplicate → null) sans exception', function (): void {
     $lastFetchedAt = null;
 
     $sourceRepo = sourceRepoStub(['src-001' => activeSource()], $lastFetchedAt);
     $fetcher = fetcherStub([sampleDto('src-001', 'x'), sampleDto('src-001', 'x')]);
-    $articleRepo = articleRepoStub([false, false]); // deux doublons
+    $articleRepo = articleRepoStub([false, false]); // deux doublons SHA-256
 
-    $handler = new FetchSourceHandler($sourceRepo, $fetcher, $articleRepo, new NullLogger());
+    $handler = makeHandler($sourceRepo, $fetcher, $articleRepo);
 
     expect(static fn () => $handler(new FetchSourceMessage('src-001')))->not->toThrow(Throwable::class);
     // last_fetched_at quand même mis à jour
@@ -227,7 +286,7 @@ test('handler catchée une exception HTTP 5xx et met à jour last_error_at', fun
     $fetcher = fetcherStub(new RuntimeException('HTTP 503 Service Unavailable'));
     $articleRepo = articleRepoStub();
 
-    $handler = new FetchSourceHandler($sourceRepo, $fetcher, $articleRepo, new NullLogger());
+    $handler = makeHandler($sourceRepo, $fetcher, $articleRepo);
 
     // Le handler NE lève PAS d'exception — worker libéré normalement
     expect(static fn () => $handler(new FetchSourceMessage('src-503')))->not->toThrow(Throwable::class);
@@ -243,7 +302,7 @@ test('handler catchée une FeedException (XML invalide) et met à jour last_erro
     $fetcher = fetcherStub(new RuntimeException('XML parsing failed: unclosed tag'));
     $articleRepo = articleRepoStub();
 
-    $handler = new FetchSourceHandler($sourceRepo, $fetcher, $articleRepo, new NullLogger());
+    $handler = makeHandler($sourceRepo, $fetcher, $articleRepo);
     $handler(new FetchSourceMessage('src-xml'));
 
     expect($lastErrorAt)->not->toBeNull()
@@ -257,7 +316,7 @@ test('handler logue WARNING et ne crash pas si la source est introuvable', funct
     $fetcher = fetcherStub([]);
     $articleRepo = articleRepoStub();
 
-    $handler = new FetchSourceHandler($sourceRepo, $fetcher, $articleRepo, new NullLogger());
+    $handler = makeHandler($sourceRepo, $fetcher, $articleRepo);
 
     expect(static fn () => $handler(new FetchSourceMessage('unknown-id')))->not->toThrow(Throwable::class);
 });
@@ -269,8 +328,75 @@ test('handler met à jour last_fetched_at même quand aucun article n\'est retou
     $fetcher = fetcherStub([]); // flux vide
     $articleRepo = articleRepoStub();
 
-    $handler = new FetchSourceHandler($sourceRepo, $fetcher, $articleRepo, new NullLogger());
+    $handler = makeHandler($sourceRepo, $fetcher, $articleRepo);
     $handler(new FetchSourceMessage('src-empty'));
 
     expect($lastFetchedAt)->toBeInstanceOf(DateTimeImmutable::class);
+});
+
+// ── Tests US-022 : comportement SimHash dans FetchSourceHandler ─────────────
+
+test('handler catchée RuntimeException de SimHashService et continue (US-022 scénario erreur 2)', function (): void {
+    $lastFetchedAt = null;
+    $simHashThrowingStub = new class implements SimHashServiceInterface {
+        public function compute(string $title): ?int
+        {
+            throw new RuntimeException('SimHash runtime error: unexpected character');
+        }
+
+        public function distance(int $a, int $b): int
+        {
+            return 0;
+        }
+    };
+
+    $markAsDuplicateCalled = false;
+    $articleRepo = new class($markAsDuplicateCalled) implements ArticleRepositoryInterface {
+        public function __construct(private bool &$markCalled)
+        {
+        }
+
+        public function saveIgnoringDuplicate(ArticleDTO $dto): ?string
+        {
+            return 'aaaaaaaa-bbbb-cccc-dddd-000000000001';
+        }
+
+        public function findPotentialDuplicates(int $simhash, DateTimeImmutable $publishedAt, int $threshold): array
+        {
+            return [];
+        }
+
+        public function markAsDuplicate(string $articleId, int $simhash, string $duplicateOfId): void
+        {
+            $this->markCalled = true;
+        }
+
+        public function updateTitleSimHash(string $articleId, int $simhash): void
+        {
+        }
+
+        public function findPaginatedWithSourceName(int $page, int $perPage): array
+        {
+            return [];
+        }
+
+        public function countAll(): int
+        {
+            return 0;
+        }
+    };
+
+    $sourceRepo = sourceRepoStub(['src-001' => activeSource()], $lastFetchedAt);
+    $fetcher = fetcherStub([sampleDto('src-001', 'a')]);
+
+    $handler = new FetchSourceHandler(
+        $sourceRepo, $fetcher, $articleRepo, new NullLogger(), $simHashThrowingStub, 3,
+    );
+
+    // Ne doit PAS lever d'exception — pipeline non bloqué
+    expect(static fn () => $handler(new FetchSourceMessage('src-001')))->not->toThrow(Throwable::class);
+    // last_fetched_at mis à jour (ingestion terminée normalement)
+    expect($lastFetchedAt)->toBeInstanceOf(DateTimeImmutable::class);
+    // markAsDuplicate jamais appelé (simhash a échoué)
+    expect($markAsDuplicateCalled)->toBeFalse();
 });

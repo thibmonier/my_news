@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Application\Brief\FeaturedSummary\FeaturedSummaryServiceInterface;
 use App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefHandler;
 use App\Application\Brief\GenerateDailyBrief\GenerateDailyBriefMessage;
+use App\Domain\Brief\BriefPublicViewRepositoryInterface;
 use App\Domain\Brief\BriefSelectorServiceInterface;
+use App\Domain\Brief\DailyBriefRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -58,7 +61,12 @@ test('Nominal : lock acquis → selectTopStories() exécuté → lock libéré �
         },
     );
 
-    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory);
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null); // skip featured summary
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
+    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory, $featuredSummaryService, $dailyBriefRepository, $briefPublicViewRepository);
     $handler(new GenerateDailyBriefMessage('2026-07-28'));
 
     expect($loggedInfos)->toContain('brief.batch_start');
@@ -90,7 +98,12 @@ test('Lock déjà acquis : TryLock=false → log brief.lock_already_acquired →
         },
     );
 
-    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory);
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null); // skip featured summary
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
+    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory, $featuredSummaryService, $dailyBriefRepository, $briefPublicViewRepository);
     $handler(new GenerateDailyBriefMessage('2026-07-28'));
 
     expect($loggedInfos)->toContain('brief.lock_already_acquired');
@@ -132,7 +145,12 @@ test('Redis KO : LockStorageException → log brief.lock_unavailable → service
         },
     );
 
-    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory);
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null); // skip featured summary
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
+    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory, $featuredSummaryService, $dailyBriefRepository, $briefPublicViewRepository);
 
     // Mode dégradé = pas d'exception levée
     expect(static fn () => $handler(new GenerateDailyBriefMessage('2026-07-28')))
@@ -168,7 +186,12 @@ test('Erreur technique : exception propagée pour retry Messenger + lock libér�
         },
     );
 
-    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory);
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null); // skip featured summary
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
+    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory, $featuredSummaryService, $dailyBriefRepository, $briefPublicViewRepository);
 
     // L'exception DOIT être propagée pour que Messenger marque le message "failed" → retry
     expect(static fn () => $handler(new GenerateDailyBriefMessage('2026-07-28')))
@@ -202,7 +225,12 @@ test('brief.batch_success contient duration_ms (entier) et la date cible', funct
         },
     );
 
-    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory);
+    $featuredSummaryService = $this->createMock(FeaturedSummaryServiceInterface::class);
+    $dailyBriefRepository = $this->createMock(DailyBriefRepositoryInterface::class);
+    $dailyBriefRepository->method('findForDate')->willReturn(null); // skip featured summary
+    $briefPublicViewRepository = $this->createMock(BriefPublicViewRepositoryInterface::class);
+
+    $handler = new GenerateDailyBriefHandler($selectorMock, $dispatcher, $logger, $lockFactory, $featuredSummaryService, $dailyBriefRepository, $briefPublicViewRepository);
     $handler(new GenerateDailyBriefMessage('2026-07-28'));
 
     expect($successContexts)->toHaveCount(1, 'Un seul log brief.batch_success attendu');

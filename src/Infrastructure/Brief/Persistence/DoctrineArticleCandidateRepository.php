@@ -55,6 +55,7 @@ final class DoctrineArticleCandidateRepository implements ArticleCandidateReposi
                 FROM articles a
                 WHERE a.published_at >= :since
                   AND a.is_full_text_accessible = TRUE
+                  AND a.is_duplicate = FALSE
                 ORDER BY a.published_at DESC, a.id ASC
                 LIMIT :limit
                 SQL,

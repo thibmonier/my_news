@@ -11,6 +11,7 @@ use App\Domain\Synthesis\SynthesisCacheInterface;
 use App\Domain\Synthesis\SynthesisLevel;
 use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisResponse;
+use App\Domain\Synthesis\SynthesisResponseWithCacheStatus;
 use App\Domain\Synthesis\SynthesisResult;
 use App\Domain\Synthesis\SynthesisResultRepositoryInterface;
 use App\Domain\Synthesis\SynthesisServiceInterface;
@@ -19,21 +20,25 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Service Application — Orchestration de la synthèse IA d'un article (US-010 + US-011).
+ * Service Application — Orchestration de la synthèse IA d'un article (US-010 + US-011 + US-012).
  *
  * Flux d'exécution :
- * 1. Validation SSRF stricte de l'URL (filter_var + rejet IP RFC 1918 + loopback)
- * 2. Cache Redis (clé sha256(url . '_' . level), TTL 24 h) — retour immédiat si chaud
- * 3. Fetch du contenu de l'article (ArticleContentFetcherInterface)
- * 4. Appel Mistral avec prompt adapté au niveau (SynthesisLevel::promptInstructions())
+ * 1. Normalisation/canonicalisation de l'URL via UrlNormalizer (US-012 T-012-01)
+ *    Lowercase scheme+host, tri query params, suppression fragment, rejet \r\n\0
+ * 2. Validation SSRF stricte de l'URL normalisée (filter_var + rejet IP RFC 1918 + loopback)
+ * 3. Cache Redis (clé sha256(normalizedUrl . '_' . level), TTL 24 h) — retour HIT si chaud
+ *    En cas d'indisponibilité Redis : status BYPASS, poursuite sans cache
+ * 4. Fetch du contenu de l'article (ArticleContentFetcherInterface)
+ * 5. Appel Mistral avec prompt adapté au niveau (SynthesisLevel::promptInstructions())
  *    et timeout adapté (SynthesisLevel::timeoutSeconds()) — US-011
- * 5. Parse de la réponse texte Mistral → SynthesisResponse structurée
- * 6. Calcul url_hash SHA-256 (jamais l'URL brute dans les logs)
- * 7. Persistence du résultat avec le niveau (SynthesisResultRepositoryInterface)
- * 8. Mise en cache de la réponse (SynthesisCacheInterface)
+ * 6. Parse de la réponse texte Mistral → SynthesisResponse structurée
+ * 7. Calcul url_hash SHA-256 sur URL normalisée (jamais l'URL brute dans les logs)
+ * 8. Persistence du résultat avec le niveau (SynthesisResultRepositoryInterface)
+ * 9. Mise en cache de la réponse (sauf si BYPASS) (SynthesisCacheInterface)
  *
  * Sécurité :
  * - SSRF : validation URL + résolution DNS + rejet RFC 1918/loopback (OWASP A01)
+ * - Anti key-injection : UrlNormalizer rejette \r, \n, \0 avant tout traitement
  * - PII : aucun email / UUID utilisateur dans le prompt Mistral (RGPD — T-010-11)
  * - Logging : url_hash et level uniquement, jamais l'URL brute ni l'identifiant utilisateur
  *
@@ -52,37 +57,63 @@ final class SynthesisService implements SynthesisServiceInterface
         private readonly SynthesisResultRepositoryInterface $repository,
         private readonly LoggerInterface $logger,
         private readonly ?SynthesisCacheInterface $cache = null,
+        private readonly ?UrlNormalizer $normalizer = null,
     ) {
     }
 
     /**
      * Génère une synthèse IA pour l'URL fournie au niveau demandé.
      *
-     * @throws InvalidSynthesisUrlException si l'URL est malformée ou cible une IP privée (SSRF)
+     * Retourne un SynthesisResponseWithCacheStatus avec :
+     *   - HIT    : synthèse servie depuis Redis (aucun appel Mistral)
+     *   - MISS   : synthèse générée par Mistral et mise en cache
+     *   - BYPASS : Redis indisponible, synthèse générée sans cache
+     *
+     * @throws InvalidSynthesisUrlException si l'URL est malformée, contient des caractères
+     *                                      de contrôle (\r\n\0), ou cible une IP privée (SSRF)
      * @throws SynthesisUnavailableException si Mistral est inaccessible
      */
-    public function synthesize(SynthesisRequest $request): SynthesisResponse
+    public function synthesize(SynthesisRequest $request): SynthesisResponseWithCacheStatus
     {
-        // ── 1. Validation SSRF ───────────────────────────────────────────────
-        $this->validateUrlForSsrf($request->url);
+        // ── 1. Normalisation URL + validation SSRF ───────────────────────────
+        // L'URL normalisée est utilisée pour le cache key et le url_hash loggué.
+        // La validation SSRF opère sur l'URL normalisée (lowercase host, etc.).
+        $normalizedUrl = null !== $this->normalizer
+            ? $this->normalizer->normalize($request->url)
+            : $request->url;
+
+        $this->validateUrlForSsrf($normalizedUrl);
 
         // ── 2. Cache check ───────────────────────────────────────────────────
-        $cacheKey = $this->buildCacheKey($request->url, $request->level);
+        $cacheKey = $this->buildCacheKey($normalizedUrl, $request->level);
+        $cacheStatus = SynthesisResponseWithCacheStatus::MISS;
 
         if (null !== $this->cache) {
-            $cached = $this->cache->get($cacheKey);
+            try {
+                $cached = $this->cache->get($cacheKey);
 
-            if (null !== $cached) {
-                $this->logger->debug('synthesis.cache_hit', [
-                    'url_hash' => hash('sha256', $request->url),
+                if (null !== $cached) {
+                    $this->logger->debug('synthesis.cache_hit', [
+                        'url_hash' => hash('sha256', $normalizedUrl),
+                        'level' => $request->level->value,
+                    ]);
+
+                    return new SynthesisResponseWithCacheStatus($cached, SynthesisResponseWithCacheStatus::HIT);
+                }
+
+                // Cache disponible mais pas d'entrée → MISS (comportement par défaut)
+                $this->logger->debug('synthesis.cache_miss', [
+                    'url_hash' => hash('sha256', $normalizedUrl),
                     'level' => $request->level->value,
                 ]);
-
-                return $cached;
+            } catch (\Throwable) {
+                // Redis indisponible → BYPASS : appel Mistral direct, pas de mise en cache
+                $cacheStatus = SynthesisResponseWithCacheStatus::BYPASS;
             }
         }
 
         // ── 3. Fetch du contenu ──────────────────────────────────────────────
+        // Fetch avec l'URL originale (pour respecter les redirections du serveur)
         $fetched = $this->contentFetcher->fetchContent($request->url);
 
         // ── 4. Appel Mistral (prompt + timeout adaptés au niveau) ────────────
@@ -97,7 +128,8 @@ final class SynthesisService implements SynthesisServiceInterface
         $response = $this->parseResponse($rawResponse, $request->url, $fetched->isPartial);
 
         // ── 6. Persistence ───────────────────────────────────────────────────
-        $urlHash = hash('sha256', $request->url);
+        // url_hash calculé sur l'URL normalisée (PII-safe, déterministe, clé unique)
+        $urlHash = hash('sha256', $normalizedUrl);
         $createdAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
         $result = new SynthesisResult(
@@ -112,8 +144,8 @@ final class SynthesisService implements SynthesisServiceInterface
 
         $this->repository->save($result);
 
-        // ── 7. Cache put ─────────────────────────────────────────────────────
-        if (null !== $this->cache) {
+        // ── 7. Cache put (seulement si Redis est disponible — pas de BYPASS) ─
+        if (SynthesisResponseWithCacheStatus::BYPASS !== $cacheStatus && null !== $this->cache) {
             $this->cache->set($cacheKey, $response, self::CACHE_TTL);
         }
 
@@ -122,23 +154,28 @@ final class SynthesisService implements SynthesisServiceInterface
             'url_hash' => $urlHash,
             'level' => $request->level->value,
             'is_partial' => $fetched->isPartial,
+            'cache_status' => $cacheStatus,
         ]);
 
-        return $response;
+        return new SynthesisResponseWithCacheStatus($response, $cacheStatus);
     }
 
     // ── Cache key ─────────────────────────────────────────────────────────────
 
     /**
-     * Construit la clé de cache pour une URL + niveau donnés.
+     * Construit la clé de cache pour une URL normalisée + niveau donnés.
      *
-     * Format : sha256(url . '_' . level.value)
-     * 3 clés distinctes par URL (une par niveau) — US-011 T-011-05.
-     * PII-safe : l'URL est une URL publique (pas d'identifiant utilisateur).
+     * Format : sha256(normalizedUrl . '_' . level.value)
+     * 3 clés distinctes par URL normalisée (une par niveau) — US-011 T-011-05.
+     * Canonicalisation (US-012) : l'URL est normalisée avant hash pour maximiser les hits.
+     * PII-safe : sha256 opaque, jamais l'URL en clair dans la clé Redis.
+     *
+     * @param string $normalizedUrl URL normalisée par UrlNormalizer
+     * @param SynthesisLevel $level Niveau de synthèse (concise|detailed|narrative)
      */
-    private function buildCacheKey(string $url, SynthesisLevel $level): string
+    private function buildCacheKey(string $normalizedUrl, SynthesisLevel $level): string
     {
-        return hash('sha256', $url . '_' . $level->value);
+        return hash('sha256', $normalizedUrl . '_' . $level->value);
     }
 
     // ── SSRF Validation ───────────────────────────────────────────────────────

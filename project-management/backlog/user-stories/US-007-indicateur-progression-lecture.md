@@ -9,7 +9,7 @@
 | **Persona** | P-001 Thomas — cadre dirigeant tech, 38 ans |
 | **Story Points** | 2 (Fibonacci) |
 | **Priorité** | Could Have (MoSCoW) |
-| **Sprint** | backlog |
+| **Sprint** | sprint-003-consolidation |
 
 ## User Story (3 C)
 

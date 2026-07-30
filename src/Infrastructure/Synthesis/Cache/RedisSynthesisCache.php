@@ -37,6 +37,8 @@ final class RedisSynthesisCache implements SynthesisCacheInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @throws \RuntimeException si Redis est inaccessible (signale un BYPASS au SynthesisService)
      */
     public function get(string $cacheKey): ?SynthesisResponse
     {
@@ -55,11 +57,13 @@ final class RedisSynthesisCache implements SynthesisCacheInterface
 
             return $this->deserialize($value);
         } catch (\Throwable $e) {
-            $this->logger->warning('synthesis.cache_get_error', [
+            // Redis inaccessible — loguer et propager pour que SynthesisService
+            // puisse retourner BYPASS et appeler Mistral directement (US-012 T-012-04).
+            $this->logger->warning('synthesis.cache_unavailable', [
                 'error' => $e->getMessage(),
             ]);
 
-            return null;
+            throw new \RuntimeException('Cache Redis indisponible : ' . $e->getMessage(), 0, $e);
         }
     }
 
