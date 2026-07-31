@@ -205,6 +205,8 @@ final class BriefController
                 {$this->progressBarCss()}
             </head>
             <body>
+                <!-- P1-2 : skip-link -->
+                <a href="#main-content" class="skip-link">Aller au contenu principal</a>
                 <div
                     data-controller="progress-bar"
                     role="progressbar"
@@ -557,9 +559,9 @@ final class BriefController
               font-weight: 700;
               text-transform: uppercase;
             }
-            /* Badge émeraude uniquement pour le nominal (INV-2) */
+            /* Badge émeraude foncé pour le nominal (INV-2 : signal IA conservé, contraste AA ≥4.5:1) */
             .ai-summary--nominal .ai-summary__badge-text {
-              color: var(--color-emerald-accent);
+              color: #047857; /* émeraude foncée ≈5.25:1 sur blanc — corrige P1-1 */
             }
             /* Badge neutre pour le dégradé */
             .ai-summary--degraded .ai-summary__badge-text {
@@ -599,7 +601,7 @@ final class BriefController
               letter-spacing: var(--ls-label);
               font-weight: 700;
               text-transform: uppercase;
-              color: var(--color-emerald-accent);
+              color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
               text-decoration: none;
               white-space: nowrap;
             }
@@ -784,7 +786,7 @@ final class BriefController
               font-family: var(--font-meta);
               font-size: var(--fs-label);
               letter-spacing: var(--ls-label);
-              color: var(--color-emerald-accent);
+              color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
               background: transparent;
               border: 1px solid var(--color-emerald-accent);
               padding: 0.375rem 0.75rem;
@@ -820,7 +822,7 @@ final class BriefController
               font-size: 10px;
               letter-spacing: 0.1em;
               font-weight: 700;
-              color: var(--color-emerald-accent);
+              color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
               text-transform: uppercase;
               margin-bottom: 0.5rem;
             }
@@ -860,7 +862,7 @@ final class BriefController
               font-family: var(--font-meta);
               font-size: var(--fs-label);
               letter-spacing: var(--ls-label);
-              color: var(--color-emerald-accent);
+              color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
               text-decoration: none;
               font-weight: 600;
               text-transform: uppercase;
@@ -904,7 +906,7 @@ final class BriefController
               cursor: pointer;
             }
             .level-option input[type="radio"]:checked + span {
-              color: var(--color-emerald-accent);
+              color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
               font-weight: 600;
             }
             /* Badge niveau dans le résultat (US-011) */
@@ -941,6 +943,8 @@ final class BriefController
                 {$this->pageCss()}
             </head>
             <body>
+                <!-- P1-2 : skip-link -->
+                <a href="#main-content" class="skip-link">Aller au contenu principal</a>
                 <header class="site-header" role="banner">
                     <nav class="nav-container" aria-label="Navigation principale">
                         <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
@@ -981,6 +985,8 @@ final class BriefController
                 {$this->pageCss()}
             </head>
             <body>
+                <!-- P1-2 : skip-link -->
+                <a href="#main-content" class="skip-link">Aller au contenu principal</a>
                 <header class="site-header" role="banner">
                     <nav class="nav-container">
                         <a href="/brief" class="logo">BRIEFLY</a>
@@ -1173,6 +1179,15 @@ final class BriefController
     {
         return <<<'CSS_BLOCK'
             <style>
+            /* P1-2 : skip-link (visuellement masqué, visible au focus) */
+            .skip-link { position: absolute; top: -3rem; left: 0;
+                background: var(--color-primary, #091426); color: #fff;
+                padding: .5rem 1rem; z-index: 999; text-decoration: none;
+                font-family: var(--font-meta); font-size: .875rem; font-weight: 600;
+                border-radius: 0 0 4px 0; }
+            .skip-link:focus { top: 0; }
+            /* P1-5 : focus visible ≥2px sur tous les éléments interactifs */
+            *:focus-visible { outline: 2px solid var(--color-primary, #091426); outline-offset: 2px; }
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
             body {
               font-family: var(--font-body);
@@ -1365,7 +1380,7 @@ final class BriefController
               font-family: var(--font-meta);
               font-size: var(--fs-label);
               letter-spacing: var(--ls-label);
-              color: var(--color-emerald-accent);
+              color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
               font-weight: 700;
               text-transform: uppercase;
             }
@@ -1379,6 +1394,7 @@ final class BriefController
               display: none;
             }
             @media (min-width: 768px) {
+              /* P1-1 : CTA navigation NON-IA → couleur primaire (INV-2 : émeraude réservée à l'IA) */
               .cta-read-brief {
                 display: inline-block;
                 margin-left: auto;
@@ -1386,7 +1402,7 @@ final class BriefController
                 font-size: var(--fs-label);
                 letter-spacing: var(--ls-label);
                 color: var(--color-on-primary);
-                background-color: var(--color-emerald-accent);
+                background-color: var(--color-primary);
                 text-decoration: none;
                 font-weight: 700;
                 text-transform: uppercase;
