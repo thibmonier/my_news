@@ -69,7 +69,9 @@ jobs:
 
       # ── Étape 2 : Installation ───────────────────────────────────────────────
       - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+        # --no-scripts : aligne le CI sur le Dockerfile ; l'event auto-scripts
+        # appelle symfony-cmd (fourni par symfony/flex, non requis) -> exit 127.
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
 
       # ── Étape 3 : Code style (bloquant CI — tech-spec §13.4) ────────────────
       - name: PHP CS Fixer (dry-run)
