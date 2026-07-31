@@ -235,14 +235,15 @@ final class RegistrationController
         $fullName = htmlspecialchars($formData['fullName'] ?? '', \ENT_QUOTES | \ENT_HTML5);
         $token = htmlspecialchars($csrfToken, \ENT_QUOTES | \ENT_HTML5);
 
+        // P1-4 : conteneur toujours rendu (même vide) — aria-describedby toujours résolvable
         $errorHtml = static function (array $errors, string $field): string {
             $value = $errors[$field] ?? null;
-            if (!\is_string($value) || '' === $value) {
-                return '';
-            }
-            $msg = htmlspecialchars($value, \ENT_QUOTES | \ENT_HTML5);
+            $msg = (\is_string($value) && '' !== $value)
+                ? htmlspecialchars($value, \ENT_QUOTES | \ENT_HTML5)
+                : '';
+            $classAttr = '' !== $msg ? 'class="error" ' : '';
 
-            return \sprintf('<p class="error" role="alert" id="error-%s">%s</p>', $field, $msg);
+            return \sprintf('<p %srole="alert" aria-live="assertive" id="error-%s">%s</p>', $classAttr, $field, $msg);
         };
 
         $csrfError = $errors['_csrf'] ?? null;
@@ -266,7 +267,19 @@ final class RegistrationController
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Inscription — Briefly AI</title>
                 <style>
+                    /* P1-2 : skip-link */
+                    .skip-link { position: absolute; top: -3rem; left: 0;
+                        background: #091426; color: #fff; padding: .5rem 1rem;
+                        z-index: 999; text-decoration: none; font-size: .875rem;
+                        font-weight: 600; border-radius: 0 0 4px 0; }
+                    .skip-link:focus { top: 0; }
+                    /* P1-5 : focus visible ≥2px */
+                    *:focus-visible { outline: 2px solid #091426; outline-offset: 2px; }
                     body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 1rem; }
+                    /* P1-3 : header minimal */
+                    .site-header { text-align: center; margin-bottom: 1.5rem; }
+                    .logo-link { font-weight: 800; font-size: 1.25rem; letter-spacing: .05em;
+                        text-decoration: none; color: #091426; }
                     label { display: block; margin-top: 1rem; font-weight: bold; }
                     input[type="email"], input[type="text"], input[type="password"] {
                         width: 100%; padding: .5rem; margin-top: .25rem; box-sizing: border-box;
@@ -275,20 +288,31 @@ final class RegistrationController
                     .error { color: #dc2626; font-size: .875rem; margin-top: .25rem; }
                     .error.global { background: #fee2e2; padding: .75rem; border-radius: 4px; }
                     .info-msg { background: #dbeafe; color: #1e40af; padding: .75rem; border-radius: 4px; margin-bottom: 1rem; }
+                    /* P1-1 : bouton submit NON-IA → couleur primaire (INV-2 : émeraude réservée à l'IA) */
                     button[type="submit"] {
                         margin-top: 1.5rem; width: 100%; padding: .75rem;
-                        background: #10B981; color: white; border: none; border-radius: 4px;
+                        background: #091426; color: white; border: none; border-radius: 4px;
                         font-size: 1rem; cursor: pointer;
                     }
-                    button[type="submit"]:hover { background: #059669; }
+                    button[type="submit"]:hover { background: #1a2f4f; }
                     .toggle-btn { background: none; border: none; cursor: pointer; font-size: .875rem; color: #6b7280; }
                     .password-wrapper { position: relative; }
                     .consent { display: flex; align-items: flex-start; gap: .5rem; margin-top: 1rem; }
                     .consent input { margin-top: .2rem; width: auto; }
                     .links { text-align: center; margin-top: 1rem; }
+                    /* P1-3 : footer minimal */
+                    .site-footer { text-align: center; margin-top: 2rem; font-size: .8rem; color: #6b7280; }
                 </style>
             </head>
             <body>
+                <!-- P1-2 : skip-link -->
+                <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+                <!-- P1-3 : header minimal -->
+                <header class="site-header">
+                    <a href="/" class="logo-link" aria-label="Briefly AI — accueil">BRIEFLY AI</a>
+                </header>
+                <!-- P1-3 : landmark main avec id pour le skip-link -->
+                <main id="main-content">
                 <h1>Créer un compte</h1>
                 {$globalError}
                 {$emailExistsHtml}
@@ -366,6 +390,11 @@ final class RegistrationController
                 <div class="links">
                     <p>Déjà un compte ? <a href="/login">Se connecter</a></p>
                 </div>
+                </main>
+                <!-- P1-3 : footer minimal -->
+                <footer class="site-footer">
+                    <p>© Briefly AI</p>
+                </footer>
 
                 <!-- Stimulus controller password-toggle (Sprint 1 stub — nécessite @symfony/stimulus-bridge) -->
                 <script>

@@ -8,7 +8,8 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: system-ui, -apple-system, sans-serif; background: #f5f7fa; color: #1a1a2e; min-height: 100vh; }
         .nav { background: #1a1a2e; color: #fff; padding: 0 1.5rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; }
-        .nav .brand { font-weight: 700; font-size: 1rem; color: #10B981; text-decoration: none; }
+        /* P1-1 : logo brand NON-IA → couleur blanche sur fond sombre (INV-2) */
+        .nav .brand { font-weight: 700; font-size: 1rem; color: #fff; text-decoration: none; }
         .nav a { color: #ccc; text-decoration: none; font-size: 0.875rem; }
         .nav a:hover { color: #fff; }
         .main { max-width: 640px; margin: 2rem auto; padding: 0 1.5rem; }
@@ -18,31 +19,44 @@
         .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 2rem; }
         .card h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 0.375rem; }
         .card .subtitle { color: #6b7280; font-size: 0.875rem; margin-bottom: 1.75rem; }
-        .avatar { width: 56px; height: 56px; border-radius: 50%; background: #10B981; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700; margin-bottom: 1.25rem; }
+        /* P1-1 : avatar initiales NON-IA → couleur primaire (INV-2 : émeraude réservée à l'IA) */
+        .avatar { width: 56px; height: 56px; border-radius: 50%; background: #091426; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700; margin-bottom: 1.25rem; }
         .form-group { margin-bottom: 1.25rem; }
         label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.375rem; }
         .input, .textarea { width: 100%; padding: 0.625rem 0.875rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; font-family: inherit; background: #fff; transition: border-color .15s; }
-        .input:focus, .textarea:focus { outline: none; border-color: #10B981; box-shadow: 0 0 0 3px rgba(16,185,129,.1); }
+        /* P1-5 : focus visible ≥2px — retire outline:none, utilise couleur primaire */
+        .input:focus, .textarea:focus { outline: 2px solid #091426; outline-offset: 2px; border-color: #091426; }
         .textarea { resize: vertical; }
         .help { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
         .bio-counter { display: block; font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; text-align: right; }
         .form-error { color: #dc2626; font-size: 0.75rem; margin-top: 0.25rem; display: block; }
-        .btn-submit { display: inline-flex; align-items: center; gap: .375rem; padding: 0.625rem 1.5rem; background: #10B981; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background .15s; }
-        .btn-submit:hover { background: #059669; }
+        /* P1-1 : bouton submit NON-IA → couleur primaire (INV-2 : émeraude réservée à l'IA) */
+        .btn-submit { display: inline-flex; align-items: center; gap: .375rem; padding: 0.625rem 1.5rem; background: #091426; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+        .btn-submit:hover { background: #1a2f4f; }
         .separator { border: none; border-top: 1px solid #e5e7eb; margin: 1.75rem 0; }
         .email-note { background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 0.625rem 0.875rem; font-size: 0.8rem; color: #854d0e; margin-bottom: 1.25rem; }
         {% if user.emailPending is not null %}
         .email-pending { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 0.625rem 0.875rem; font-size: 0.8rem; color: #1e40af; margin-bottom: 1.25rem; }
         {% endif %}
+        /* P1-2 : skip-link */
+        .skip-link { position: absolute; top: -3rem; left: 0; background: #091426; color: #fff;
+            padding: .5rem 1rem; z-index: 999; text-decoration: none; font-size: .875rem;
+            font-weight: 600; border-radius: 0 0 4px 0; }
+        .skip-link:focus { top: 0; }
+        /* P1-5 : focus visible ≥2px sur tous les éléments interactifs */
+        *:focus-visible { outline: 2px solid #091426; outline-offset: 2px; }
     </style>
 </head>
 <body>
+    <!-- P1-2 : skip-link -->
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
     <nav class="nav">
         <a class="brand" href="/dashboard">Briefly AI</a>
         <a href="/dashboard">Tableau de bord</a>
     </nav>
 
-    <main class="main">
+    <!-- P1-3 : landmark main avec id pour le skip-link -->
+    <main class="main" id="main-content">
         {# Flash messages hors du Turbo Frame pour persister lors de la navigation Turbo #}
         {% for type, messages in app.flashes %}
             {% for message in messages %}
