@@ -6,6 +6,7 @@ namespace App\Presentation\Controller;
 
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
 
 /**
@@ -25,10 +26,18 @@ use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
 final class LoginController
 {
     #[Route('/login', name: 'app_login', methods: ['GET', 'POST'])]
-    public function __invoke(AuthenticationUtils $authenticationUtils): Response
-    {
+    public function __invoke(
+        AuthenticationUtils $authenticationUtils,
+        CsrfTokenManagerInterface $csrfTokenManager,
+    ): Response {
         $lastEmail = htmlspecialchars(
             $authenticationUtils->getLastUsername(),
+            \ENT_QUOTES | \ENT_HTML5,
+        );
+
+        // Jeton CSRF attendu par form_login (enable_csrf: true, id « authenticate »).
+        $csrfToken = htmlspecialchars(
+            $csrfTokenManager->getToken('authenticate')->getValue(),
             \ENT_QUOTES | \ENT_HTML5,
         );
 
@@ -94,6 +103,8 @@ final class LoginController
                         required
                         autocomplete="current-password"
                     >
+
+                    <input type="hidden" name="_csrf_token" value="{$csrfToken}">
 
                     <button type="submit">Se connecter</button>
                 </form>
