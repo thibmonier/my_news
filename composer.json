@@ -92,6 +92,9 @@
             "pestphp/pest-plugin": true
         },
         "sort-packages": true,
+        "audit": {
+            "abandoned": "report"
+        },
         "platform": {
             "php": "8.5"
         }
