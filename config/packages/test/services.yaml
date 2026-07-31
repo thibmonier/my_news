@@ -4,3 +4,12 @@
 services:
     _defaults:
         public: true
+
+    # Stub par défaut — FeaturedSummaryServiceInterface retourne null en test.
+    # Les tests qui ont besoin d'un résultat réel écrasent ce stub avec
+    # static::getContainer()->set(FeaturedSummaryServiceInterface::class, stub).
+    # Évite que le service Redis réel pollue les tests qui ne le mockent pas.
+    Tests\Stub\NullFeaturedSummaryService: ~
+
+    App\Application\Brief\FeaturedSummary\FeaturedSummaryServiceInterface:
+        alias: Tests\Stub\NullFeaturedSummaryService

@@ -84,11 +84,12 @@ test('P1-1 INV-2 : bouton submit de /login n\'utilise pas la couleur émeraude #
 
     $content = (string) $client->getResponse()->getContent();
 
-    // Le bouton submit ne doit pas avoir background:#10B981 (couleur réservée à l'IA — INV-2)
-    // On vérifie que la ligne CSS du bouton submit utilise la couleur primaire
-    expect($content)->toContain('button[type="submit"]');
-    // background:#10B981 ne doit pas apparaître dans le bloc CSS du bouton submit
-    expect($content)->not->toMatch('/button\[type="submit"\][^}]*background:\s*#10B981/');
+    // Post-migration Twig : le bouton principal utilise la classe .btn--primary
+    // (couleur --color-primary #091426), jamais l'émeraude #10B981 réservée à l'IA (INV-2).
+    expect($content)->toContain('type="submit"');
+    expect($content)->toContain('btn--primary');
+    // Aucune émeraude ne doit apparaître sur une page d'authentification (pas d'IA).
+    expect($content)->not->toContain('#10B981');
 });
 
 test('P1-1 INV-2 : bouton submit de /register n\'utilise pas la couleur émeraude #10B981 en fond', function (): void {
@@ -97,6 +98,7 @@ test('P1-1 INV-2 : bouton submit de /register n\'utilise pas la couleur émeraud
 
     $content = (string) $client->getResponse()->getContent();
 
-    expect($content)->toContain('button[type="submit"]');
-    expect($content)->not->toMatch('/button\[type="submit"\][^}]*background:\s*#10B981/');
+    expect($content)->toContain('type="submit"');
+    expect($content)->toContain('btn--primary');
+    expect($content)->not->toContain('#10B981');
 });

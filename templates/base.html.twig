@@ -1,0 +1,42 @@
+{# Briefly AI — layout de base. Source de vérité UI : Stitch 7076573032400883843 (ADR-011).
+   Tokens DRY via public/css/tokens.css ; primitives via public/css/app.css.
+   Polices : self-hosting différé (P2-04) ; les font-stacks des tokens assurent le fallback système. #}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Briefly AI{% endblock %}</title>
+    <link rel="stylesheet" href="/css/tokens.css">
+    <link rel="stylesheet" href="/css/app.css">
+    {# Applique le thème mémorisé avant paint pour éviter le flash (FOUC). #}
+    <script>(function(){try{var t=localStorage.getItem('theme');if(t){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
+    {% block head_meta %}{% endblock %}
+    {% block stylesheets %}{% endblock %}
+</head>
+<body{% block body_attr %}{% endblock %}>
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+    {% block header %}
+    <header class="site-header">
+        <a href="/" class="logo-link" aria-label="Briefly AI — accueil">BRIEFLY AI</a>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Basculer le thème clair/sombre">
+            <span aria-hidden="true">◐</span> Thème
+        </button>
+    </header>
+    {% endblock %}
+
+    <main id="main-content">
+        {% block body %}{% endblock %}
+    </main>
+
+    {% block footer %}
+    <footer class="site-footer">
+        <p>© Briefly AI</p>
+    </footer>
+    {% endblock %}
+
+    <script src="/js/theme-toggle.js" defer></script>
+    {% block javascripts %}{% endblock %}
+</body>
+</html>

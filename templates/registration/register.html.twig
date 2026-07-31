@@ -1,0 +1,143 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Inscription — Briefly AI{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .auth { max-width: 480px; margin: var(--space-stack-lg) auto 0; }
+    .auth h1 { margin-bottom: var(--space-stack-md); }
+    .auth-alt { text-align: center; margin-top: var(--space-stack-md); color: var(--color-on-surface-variant); }
+    .consent { display: flex; align-items: flex-start; gap: .5rem; margin-top: var(--space-stack-md); }
+    .consent input[type="checkbox"] { margin-top: .2rem; width: auto; flex-shrink: 0; }
+    .consent label { font-weight: normal; margin-bottom: 0; }
+    .password-wrapper { display: flex; align-items: center; gap: .5rem; }
+    .password-wrapper input { flex: 1; }
+    .toggle-btn {
+        background: none; border: 1px solid var(--color-outline); border-radius: var(--radius);
+        cursor: pointer; font-size: var(--fs-label); color: var(--color-on-surface-variant);
+        padding: .25rem .5rem; white-space: nowrap;
+    }
+    .info-msg {
+        color: var(--color-on-surface); background: var(--color-primary-container);
+        padding: .75rem; border-radius: var(--radius);
+        border: 1px solid var(--color-surface-border);
+        margin-bottom: var(--space-stack-sm);
+    }
+    .global-error { margin-bottom: var(--space-stack-sm); }
+    [role="alert"]:empty, [role="status"]:empty { display: none; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="auth container">
+    <h1>Créer un compte</h1>
+
+    {# Erreur CSRF — globale, bloquante #}
+    {% if errors._csrf is defined and errors._csrf %}
+    <div class="error is-error global-error" role="alert">{{ errors._csrf }}</div>
+    {% endif %}
+
+    {# Email déjà existant — anti-énumération (HTTP 200, pas 422) #}
+    {% if errors._email_exists is defined and errors._email_exists %}
+    <div class="info-msg" role="status">{{ errors._email_exists }}</div>
+    {% endif %}
+
+    <form method="POST" action="/register" novalidate>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('registration') }}">
+
+        <div class="form-field">
+            <label for="email">Adresse email *</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                value="{{ formData.email }}"
+                required
+                autocomplete="email"
+                aria-describedby="error-email"
+            >
+            {# P1-4 : conteneur toujours présent — aria-describedby toujours résolvable #}
+            <p id="error-email" role="alert" aria-live="assertive"{% if errors.email is defined and errors.email is not empty %} class="error"{% endif %}>{%- if errors.email is defined and errors.email is not empty %}{{ errors.email }}{% endif -%}</p>
+        </div>
+
+        <div class="form-field">
+            <label for="fullName">Nom complet *</label>
+            <input
+                type="text"
+                id="fullName"
+                name="fullName"
+                value="{{ formData.fullName }}"
+                required
+                autocomplete="name"
+                aria-describedby="error-fullName"
+            >
+            <p id="error-fullName" role="alert" aria-live="assertive"{% if errors.fullName is defined and errors.fullName is not empty %} class="error"{% endif %}>{%- if errors.fullName is defined and errors.fullName is not empty %}{{ errors.fullName }}{% endif -%}</p>
+        </div>
+
+        <div class="form-field">
+            <label for="plainPassword">Mot de passe *</label>
+            <div class="password-wrapper">
+                <input
+                    type="password"
+                    id="plainPassword"
+                    name="plainPassword"
+                    required
+                    autocomplete="new-password"
+                    aria-describedby="hint-plainPassword error-plainPassword"
+                    data-controller="password-toggle"
+                    data-password-toggle-target="input"
+                >
+                <button
+                    type="button"
+                    class="toggle-btn"
+                    data-action="password-toggle#toggle"
+                    data-password-toggle-target="button"
+                    aria-label="Afficher le mot de passe"
+                >Afficher</button>
+            </div>
+            <small class="field-hint" id="hint-plainPassword">Minimum 12 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.</small>
+            <p id="error-plainPassword" role="alert" aria-live="assertive"{% if errors.plainPassword is defined and errors.plainPassword is not empty %} class="error"{% endif %}>{%- if errors.plainPassword is defined and errors.plainPassword is not empty %}{{ errors.plainPassword }}{% endif -%}</p>
+        </div>
+
+        <div class="consent">
+            <input
+                type="checkbox"
+                id="consentCgu"
+                name="consentCgu"
+                value="1"
+                required
+                aria-describedby="error-consentCgu"
+            >
+            <label for="consentCgu">
+                J'accepte les
+                <a href="/legal/cgu">Conditions Générales d'Utilisation</a>
+                et la
+                <a href="/legal/privacy">Politique de confidentialité</a> *
+            </label>
+        </div>
+        <p id="error-consentCgu" role="alert" aria-live="assertive"{% if errors.consentCgu is defined and errors.consentCgu is not empty %} class="error"{% endif %}>{%- if errors.consentCgu is defined and errors.consentCgu is not empty %}{{ errors.consentCgu }}{% endif -%}</p>
+
+        {# INV-2 : bouton NON-IA → btn--primary (jamais émeraude) #}
+        <button type="submit" class="btn btn--primary" style="margin-top: var(--space-stack-md);">Créer mon compte</button>
+    </form>
+
+    <p class="auth-alt">Déjà un compte ? <a href="/login">Se connecter</a></p>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{# Stimulus controller password-toggle — stub vanilla JS (remplacé par @symfony/stimulus-bridge en P2) #}
+<script>
+    (function() {
+        const btn = document.querySelector('[data-action="password-toggle#toggle"]');
+        const input = document.querySelector('[data-password-toggle-target="input"]');
+        if (!btn || !input) return;
+        btn.addEventListener('click', function() {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            btn.textContent = isPassword ? 'Masquer' : 'Afficher';
+            btn.setAttribute('aria-label', isPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+        });
+    })();
+</script>
+{% endblock %}
