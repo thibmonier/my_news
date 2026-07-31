@@ -7,6 +7,7 @@ namespace App\Presentation\Controller;
 use App\Application\User\Register\EmailAlreadyExistsException;
 use App\Application\User\Register\RegisterUserCommand;
 use App\Application\User\Register\RegisterUserHandler;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -33,12 +34,11 @@ use Symfony\Component\Uid\Uuid;
  *   - Pas de fuite sur email dupliqué (OWASP #8 — scénario alternatif 2)
  *   - Mot de passe en clair jamais logué (#[\SensitiveParameter] dans le Handler)
  *
- * Note Sprint 1 : réponse HTML inline (Twig non installé en Sprint 1).
- * À migrer vers un template Twig + Stimulus quand symfony/twig-bundle sera ajouté.
+ * Vue : templates/registration/register.html.twig (migré depuis heredoc Sprint 1).
  *
  * Couche Presentation — dépend de Application + Domain (deptrac).
  */
-final class RegistrationController
+final class RegistrationController extends AbstractController
 {
     private const CSRF_TOKEN_ID = 'registration';
     private const PASSWORD_REGEX = '/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/';
@@ -73,7 +73,6 @@ final class RegistrationController
             'email' => '',
             'fullName' => '',
         ];
-        $successMessage = null;
 
         if ($request->isMethod('POST')) {
             [$errors, $formData, $loginOrRedirect] = $this->handlePost($request);
@@ -83,16 +82,20 @@ final class RegistrationController
             }
         }
 
-        $csrfToken = $this->csrfTokenManager->getToken(self::CSRF_TOKEN_ID)->getValue();
-
         // Duplicate-email is a "soft" case: return 200 (anti-enumeration OWASP A07).
         // Real validation errors (CSRF, format, missing fields) still return 422.
         $validationErrors = array_diff_key($errors, ['_email_exists' => null]);
 
-        return new Response(
-            content: $this->renderForm($formData, $errors, $csrfToken),
-            status: [] !== $validationErrors ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK,
-        );
+        $response = $this->render('registration/register.html.twig', [
+            'formData' => $formData,
+            'errors' => $errors,
+        ]);
+
+        if ([] !== $validationErrors) {
+            $response->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $response;
     }
 
     // ── Traitement POST ────────────────────────────────────────────────────────
@@ -221,197 +224,5 @@ final class RegistrationController
         }
 
         return $errors;
-    }
-
-    // ── Vue inline (Sprint 1 — Twig non installé) ─────────────────────────────
-
-    /**
-     * @param array<string,string> $formData
-     * @param array<string,string> $errors
-     */
-    private function renderForm(array $formData, array $errors, string $csrfToken): string
-    {
-        $email = htmlspecialchars($formData['email'] ?? '', \ENT_QUOTES | \ENT_HTML5);
-        $fullName = htmlspecialchars($formData['fullName'] ?? '', \ENT_QUOTES | \ENT_HTML5);
-        $token = htmlspecialchars($csrfToken, \ENT_QUOTES | \ENT_HTML5);
-
-        // P1-4 : conteneur toujours rendu (même vide) — aria-describedby toujours résolvable
-        $errorHtml = static function (array $errors, string $field): string {
-            $value = $errors[$field] ?? null;
-            $msg = (\is_string($value) && '' !== $value)
-                ? htmlspecialchars($value, \ENT_QUOTES | \ENT_HTML5)
-                : '';
-            $classAttr = '' !== $msg ? 'class="error" ' : '';
-
-            return \sprintf('<p %srole="alert" aria-live="assertive" id="error-%s">%s</p>', $classAttr, $field, $msg);
-        };
-
-        $csrfError = $errors['_csrf'] ?? null;
-        $globalError = null !== $csrfError ? \sprintf(
-            '<div class="error global" role="alert">%s</div>',
-            htmlspecialchars($csrfError, \ENT_QUOTES | \ENT_HTML5),
-        ) : '';
-
-        // Anti-enumeration: duplicate email shown as informational message at HTTP 200.
-        $emailExistsMsg = $errors['_email_exists'] ?? null;
-        $emailExistsHtml = null !== $emailExistsMsg ? \sprintf(
-            '<div class="info-msg" role="status">%s</div>',
-            htmlspecialchars($emailExistsMsg, \ENT_QUOTES | \ENT_HTML5),
-        ) : '';
-
-        return <<<HTML
-            <!DOCTYPE html>
-            <html lang="fr">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Inscription — Briefly AI</title>
-                <style>
-                    /* P1-2 : skip-link */
-                    .skip-link { position: absolute; top: -3rem; left: 0;
-                        background: #091426; color: #fff; padding: .5rem 1rem;
-                        z-index: 999; text-decoration: none; font-size: .875rem;
-                        font-weight: 600; border-radius: 0 0 4px 0; }
-                    .skip-link:focus { top: 0; }
-                    /* P1-5 : focus visible ≥2px */
-                    *:focus-visible { outline: 2px solid #091426; outline-offset: 2px; }
-                    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 1rem; }
-                    /* P1-3 : header minimal */
-                    .site-header { text-align: center; margin-bottom: 1.5rem; }
-                    .logo-link { font-weight: 800; font-size: 1.25rem; letter-spacing: .05em;
-                        text-decoration: none; color: #091426; }
-                    label { display: block; margin-top: 1rem; font-weight: bold; }
-                    input[type="email"], input[type="text"], input[type="password"] {
-                        width: 100%; padding: .5rem; margin-top: .25rem; box-sizing: border-box;
-                        border: 1px solid #ccc; border-radius: 4px;
-                    }
-                    .error { color: #dc2626; font-size: .875rem; margin-top: .25rem; }
-                    .error.global { background: #fee2e2; padding: .75rem; border-radius: 4px; }
-                    .info-msg { background: #dbeafe; color: #1e40af; padding: .75rem; border-radius: 4px; margin-bottom: 1rem; }
-                    /* P1-1 : bouton submit NON-IA → couleur primaire (INV-2 : émeraude réservée à l'IA) */
-                    button[type="submit"] {
-                        margin-top: 1.5rem; width: 100%; padding: .75rem;
-                        background: #091426; color: white; border: none; border-radius: 4px;
-                        font-size: 1rem; cursor: pointer;
-                    }
-                    button[type="submit"]:hover { background: #1a2f4f; }
-                    .toggle-btn { background: none; border: none; cursor: pointer; font-size: .875rem; color: #6b7280; }
-                    .password-wrapper { position: relative; }
-                    .consent { display: flex; align-items: flex-start; gap: .5rem; margin-top: 1rem; }
-                    .consent input { margin-top: .2rem; width: auto; }
-                    .links { text-align: center; margin-top: 1rem; }
-                    /* P1-3 : footer minimal */
-                    .site-footer { text-align: center; margin-top: 2rem; font-size: .8rem; color: #6b7280; }
-                </style>
-            </head>
-            <body>
-                <!-- P1-2 : skip-link -->
-                <a href="#main-content" class="skip-link">Aller au contenu principal</a>
-                <!-- P1-3 : header minimal -->
-                <header class="site-header">
-                    <a href="/" class="logo-link" aria-label="Briefly AI — accueil">BRIEFLY AI</a>
-                </header>
-                <!-- P1-3 : landmark main avec id pour le skip-link -->
-                <main id="main-content">
-                <h1>Créer un compte</h1>
-                {$globalError}
-                {$emailExistsHtml}
-                <form method="POST" action="/register" novalidate>
-                    <input type="hidden" name="_csrf_token" value="{$token}">
-
-                    <label for="email">Adresse email *</label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        value="{$email}"
-                        required
-                        autocomplete="email"
-                        aria-describedby="error-email"
-                    >
-                    {$errorHtml($errors, 'email')}
-
-                    <label for="fullName">Nom complet *</label>
-                    <input
-                        type="text"
-                        id="fullName"
-                        name="fullName"
-                        value="{$fullName}"
-                        required
-                        autocomplete="name"
-                        aria-describedby="error-fullName"
-                    >
-                    {$errorHtml($errors, 'fullName')}
-
-                    <label for="plainPassword">Mot de passe *</label>
-                    <div class="password-wrapper">
-                        <input
-                            type="password"
-                            id="plainPassword"
-                            name="plainPassword"
-                            required
-                            autocomplete="new-password"
-                            aria-describedby="error-plainPassword"
-                            data-controller="password-toggle"
-                            data-password-toggle-target="input"
-                        >
-                        <button
-                            type="button"
-                            class="toggle-btn"
-                            data-action="password-toggle#toggle"
-                            data-password-toggle-target="button"
-                            aria-label="Afficher le mot de passe"
-                        >Afficher</button>
-                    </div>
-                    <small>Minimum 12 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.</small>
-                    {$errorHtml($errors, 'plainPassword')}
-
-                    <div class="consent">
-                        <input
-                            type="checkbox"
-                            id="consentCgu"
-                            name="consentCgu"
-                            value="1"
-                            required
-                            aria-describedby="error-consentCgu"
-                        >
-                        <label for="consentCgu" style="font-weight: normal; margin-top: 0;">
-                            J'accepte les
-                            <a href="/legal/cgu">Conditions Générales d'Utilisation</a>
-                            et la
-                            <a href="/legal/privacy">Politique de confidentialité</a> *
-                        </label>
-                    </div>
-                    {$errorHtml($errors, 'consentCgu')}
-
-                    <button type="submit">Créer mon compte</button>
-                </form>
-
-                <div class="links">
-                    <p>Déjà un compte ? <a href="/login">Se connecter</a></p>
-                </div>
-                </main>
-                <!-- P1-3 : footer minimal -->
-                <footer class="site-footer">
-                    <p>© Briefly AI</p>
-                </footer>
-
-                <!-- Stimulus controller password-toggle (Sprint 1 stub — nécessite @symfony/stimulus-bridge) -->
-                <script>
-                    (function() {
-                        const btn = document.querySelector('[data-action="password-toggle#toggle"]');
-                        const input = document.querySelector('[data-password-toggle-target="input"]');
-                        if (!btn || !input) return;
-                        btn.addEventListener('click', function() {
-                            const isPassword = input.type === 'password';
-                            input.type = isPassword ? 'text' : 'password';
-                            btn.textContent = isPassword ? 'Masquer' : 'Afficher';
-                            btn.setAttribute('aria-label', isPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
-                        });
-                    })();
-                </script>
-            </body>
-            </html>
-            HTML;
     }
 }

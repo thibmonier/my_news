@@ -1,0 +1,876 @@
+{#
+  brief/index.html.twig — Page principale Daily Brief (US-001 + US-004 + US-005 + US-006 + US-007 + US-011).
+
+  Variables :
+    viewModel      : App\Presentation\ViewModel\DailyBriefViewModel
+    featuredSummary: App\Domain\Brief\FeaturedSummaryDTO|null
+
+  Design system : tokens.css + app.css (base.html.twig), CSS composant inline ci-dessous.
+  XSS : Twig auto-escape (htmlspecialchars) sur toutes les variables utilisateur.
+  INV-2 : accent émeraude réservé exclusivement aux éléments IA.
+  Source de vérité design : Stitch 7076573032400883843 (ADR-011).
+#}
+{% extends 'base.html.twig' %}
+
+{% block title %}DAILY BRIEF — Briefly AI{% endblock %}
+
+{% block head_meta %}
+<meta name="description" content="Briefly AI — votre brief quotidien : fort signal, faible bruit, ton éditorial.">
+<meta property="og:title" content="DAILY BRIEF — Briefly AI">
+<meta property="og:url" content="/brief">
+<meta property="og:type" content="website">
+{% endblock %}
+
+{% block header %}
+<header class="site-header" role="banner">
+    <nav class="nav-container" aria-label="Navigation principale">
+        <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
+        {% if featuredSummary is not null %}
+        <a href="#brief-stories" class="cta-read-brief" aria-label="Lire les 3 histoires du brief">Lire le brief complet</a>
+        {% endif %}
+    </nav>
+</header>
+{% endblock %}
+
+{% block footer %}
+<footer class="site-footer" role="contentinfo">
+    <p>© Briefly AI — fort signal, faible bruit, ton éditorial.</p>
+</footer>
+{% endblock %}
+
+{% block stylesheets %}
+<style>
+/* ── Page brief — CSS composant inline (Sprint 1 — AssetMapper Sprint 2+) ────── */
+
+/* P1-2 : skip-link (visuellement masqué, visible au focus) */
+.skip-link { position: absolute; top: -3rem; left: 0;
+    background: var(--color-primary, #091426); color: #fff;
+    padding: .5rem 1rem; z-index: 999; text-decoration: none;
+    font-family: var(--font-meta); font-size: .875rem; font-weight: 600;
+    border-radius: 0 0 4px 0; }
+.skip-link:focus { top: 0; }
+/* P1-5 : focus visible ≥2px sur tous les éléments interactifs */
+*:focus-visible { outline: 2px solid var(--color-primary, #091426); outline-offset: 2px; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  line-height: var(--lh-body-md);
+  min-height: 100vh;
+}
+.site-header {
+  background-color: var(--color-primary-container);
+  padding: 1rem var(--space-gutter);
+  border-bottom: 1px solid var(--color-surface-border);
+}
+.nav-container {
+  max-width: var(--browse-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+}
+.logo {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-on-primary);
+  text-decoration: none;
+  font-weight: 700;
+}
+.main-content {
+  max-width: var(--browse-max);
+  margin: 0 auto;
+  padding: var(--space-stack-lg) var(--space-gutter);
+}
+.brief-container { max-width: var(--read-max); }
+.brief-header { margin-bottom: var(--space-stack-lg); }
+.brief-title {
+  font-family: var(--font-meta);
+  font-size: var(--fs-headline-xl);
+  line-height: var(--lh-headline-xl);
+  letter-spacing: var(--ls-headline);
+  color: var(--color-on-surface);
+  font-weight: 700;
+}
+@media (max-width: 767px) {
+  .brief-title {
+    font-size: var(--fs-headline-xl-mobile);
+    line-height: var(--lh-headline-xl-mobile);
+  }
+}
+.brief-timestamp {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-on-surface-variant);
+  margin-top: var(--space-stack-sm);
+  text-transform: uppercase;
+}
+.stories-list { list-style: none; display: flex; flex-direction: column; gap: var(--space-stack-md); }
+.story-card {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius);
+  padding: var(--space-stack-md);
+  display: flex;
+  gap: 1rem;
+  position: relative;
+}
+.story-number {
+  font-family: var(--font-meta);
+  font-size: var(--fs-headline-xl);
+  font-weight: 700;
+  color: var(--color-surface-border);
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 3rem;
+}
+.story-body { flex: 1; min-width: 0; }
+.story-title {
+  font-family: var(--font-headline);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin-bottom: var(--space-stack-sm);
+  line-height: 1.3;
+}
+.story-source {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-outline);
+  text-transform: uppercase;
+  margin-bottom: var(--space-stack-sm);
+}
+.story-excerpt {
+  font-size: var(--fs-body-md);
+  line-height: var(--lh-body-md);
+  color: var(--color-on-surface-variant);
+  margin-bottom: 1rem;
+}
+.story-link {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-slate-gray);
+  text-decoration: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  border: 1px solid var(--color-surface-border);
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius);
+  display: inline-block;
+  transition: border-color 0.15s ease;
+}
+.story-link:hover { border-color: var(--color-outline); color: var(--color-on-surface); }
+.empty-state, .error-state {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius);
+  padding: var(--space-stack-lg);
+  text-align: center;
+}
+.error-state h1 { margin-bottom: var(--space-stack-md); font-size: 24px; }
+.error-state a {
+  color: var(--color-slate-gray);
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+}
+.site-footer {
+  padding: var(--space-stack-md) var(--space-gutter);
+  text-align: center;
+  font-size: var(--fs-label);
+  color: var(--color-on-surface-variant);
+  border-top: 1px solid var(--color-surface-border);
+  margin-top: var(--space-stack-lg);
+}
+
+/* ── Badges de catégorie éditoriale (US-005) ─────────────────────────────────── */
+/* WCAG 2.1 AA : libellé texte toujours présent (couleur seule non exclusive — INV-5) */
+/* JAMAIS émeraude #10B981 sur les badges catégorie (réservé badge IA — INV-2) */
+.badge {
+  display: inline-block;
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  margin-bottom: 0.5rem;
+  background: transparent;
+  color: var(--badge-color, var(--color-outline));
+}
+.badge--ai_insight    { --badge-color: var(--color-badge-violet);     }
+.badge--geopolitics   { --badge-color: var(--color-badge-red);        }
+.badge--productivity  { --badge-color: var(--color-badge-blue);       }
+.badge--research      { --badge-color: var(--color-badge-orange);     }
+.badge--sustainability { --badge-color: var(--color-badge-green-dark); }
+
+/* ── Condensé IA (US-004) ─────────────────────────────────────────────────────── */
+/* INV-2 : accent émeraude réservé exclusivement au badge BRIEFLY AI */
+/* Classe briefly-ai-badge : identifiant de test E2E (T-004-12) */
+.ai-summary {
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  margin-bottom: 1rem;
+}
+/* Cas nominal : bordure émeraude (INV-2 — réservé à l'IA) */
+.ai-summary--nominal {
+  background: linear-gradient(135deg, rgba(16,185,129,0.05) 0%, transparent 100%);
+  border: 1px solid var(--color-emerald-accent);
+}
+/* Cas dégradé : bordure neutre (pas de couleur émeraude — INV-2) */
+.ai-summary--degraded {
+  background: var(--color-surface-card);
+  border: 1px dashed var(--color-surface-border);
+}
+.ai-summary__badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+.ai-summary__icon {
+  font-size: 14px;
+  color: var(--color-emerald-accent);
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: normal;
+}
+.ai-summary__badge-text {
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+/* Badge émeraude foncé pour le nominal (INV-2 : signal IA conservé, contraste AA ≥4.5:1) */
+.ai-summary--nominal .ai-summary__badge-text {
+  color: #047857; /* émeraude foncée ≈5.25:1 sur blanc — corrige P1-1 */
+}
+/* Badge neutre pour le dégradé */
+.ai-summary--degraded .ai-summary__badge-text {
+  color: var(--color-outline);
+  letter-spacing: 0.05em;
+}
+.ai-summary__bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem 0;
+}
+.ai-summary__bullet {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-on-surface-variant);
+  padding: 0.2rem 0 0.2rem 0.625rem;
+  border-left: 2px solid var(--color-emerald-accent);
+  margin-bottom: 0.25rem;
+}
+.ai-summary__footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.ai-summary__source {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-outline);
+  flex: 1;
+}
+.ai-summary__source span { color: var(--color-on-surface-variant); }
+.ai-summary__open-link {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ai-summary--degraded .ai-summary__open-link {
+  color: var(--color-slate-gray);
+}
+.ai-summary__open-link:hover { text-decoration: underline; }
+.ai-summary__degraded-content {
+  font-size: var(--fs-body-md);
+  color: var(--color-on-surface-variant);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+/* Google Material Symbols (inline font via CDN-free fallback) */
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.gstatic.com/s/materialsymbolsrounded/v222/syl0-zNym6-2jv1w84WQhX9R_jn9T5aQ.woff2) format('woff2');
+}
+
+/* ── Zone de synthèse IA (US-010 + US-011) ────────────────────────────────────── */
+/* INV-2 : accent émeraude (#10B981) réservé exclusivement au bloc de synthèse IA */
+.story-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.synthesis-btn {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
+  background: transparent;
+  border: 1px solid var(--color-emerald-accent);
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.synthesis-btn:hover:not(:disabled) {
+  background: var(--color-emerald-accent);
+  color: #fff;
+}
+.synthesis-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.synthesis-zone { margin-top: 0.75rem; }
+.synthesis-skeleton {
+  background: var(--color-surface-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  color: var(--color-on-surface-variant);
+  font-style: italic;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.synthesis-result {
+  background: linear-gradient(135deg, rgba(16,185,129,0.04) 0%, transparent 100%);
+  border: 1px solid var(--color-emerald-accent);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+.synthesis-badge {
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.synthesis-content {
+  font-size: var(--fs-body-md);
+  line-height: var(--lh-body-md);
+  color: var(--color-on-surface);
+  margin-bottom: 0.75rem;
+}
+.synthesis-keypoints {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+.synthesis-kp {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-on-surface-variant);
+  padding: 0.25rem 0;
+  border-left: 2px solid var(--color-emerald-accent);
+  padding-left: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.synthesis-sources {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-outline);
+  margin-bottom: 0.5rem;
+}
+.synthesis-partial {
+  font-size: var(--fs-label);
+  color: #f59e0b;
+  margin-bottom: 0.5rem;
+}
+.synthesis-original-link {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
+  text-decoration: none;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.synthesis-original-link:hover { text-decoration: underline; }
+.synthesis-error {
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  font-size: 14px;
+}
+.synthesis-error a { color: #dc2626; font-weight: 600; }
+/* ── Sélecteur de niveau (US-011) ────────────────────────────────────────────── */
+.synthesis-level-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.level-label {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-outline);
+  text-transform: uppercase;
+}
+.level-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-on-surface-variant);
+}
+.level-option input[type="radio"] {
+  accent-color: var(--color-emerald-accent);
+  cursor: pointer;
+}
+.level-option input[type="radio"]:checked + span {
+  color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
+  font-weight: 600;
+}
+/* Badge niveau dans le résultat (US-011) */
+.synthesis-level-badge {
+  display: inline-block;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-on-primary);
+  background: var(--color-emerald-accent);
+  border-radius: 2px;
+  padding: 1px 5px;
+  margin-left: 0.375rem;
+  vertical-align: middle;
+}
+
+/* ── Featured Summary (US-006) ───────────────────────────────────────────────── */
+/* Mobile : section masquée */
+.featured-summary {
+  display: none;
+}
+/* Desktop : section visible */
+@media (min-width: 768px) {
+  .featured-summary {
+    display: block;
+    background-color: var(--color-surface-card);
+    border: 1px solid var(--color-emerald-accent);
+    border-radius: var(--radius);
+    padding: var(--space-stack-md);
+    margin-bottom: var(--space-stack-md);
+  }
+  .featured-summary--fallback {
+    border-color: var(--color-surface-border);
+  }
+}
+.featured-summary__badge {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: var(--space-stack-sm);
+}
+.featured-summary__icon {
+  color: var(--color-emerald-accent);
+  font-size: 1rem;
+  line-height: 1;
+}
+.featured-summary__badge-label {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: #047857; /* P1-1 : émeraude foncée ≈5.25:1 sur blanc */
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.featured-summary__text {
+  font-size: var(--fs-body-md);
+  line-height: var(--lh-body-md);
+  color: var(--color-on-surface);
+}
+/* ── CTA "Lire le brief complet" (nav sticky, desktop uniquement) ── */
+/* P1-1 : CTA navigation NON-IA → couleur primaire (INV-2 : émeraude réservée à l'IA) */
+.cta-read-brief {
+  display: none;
+}
+@media (min-width: 768px) {
+  .cta-read-brief {
+    display: inline-block;
+    margin-left: auto;
+    font-family: var(--font-meta);
+    font-size: var(--fs-label);
+    letter-spacing: var(--ls-label);
+    color: var(--color-on-primary);
+    background-color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--radius);
+    transition: opacity 0.15s ease;
+  }
+  .cta-read-brief:hover {
+    opacity: 0.88;
+  }
+}
+
+/* ── Barre de progression de lecture (US-007) ────────────────────────────────── */
+/* INV-2 : émeraude réservée à l'IA / progression de lecture */
+/* ARIA progressbar : élément sémantique, couleur non exclusive (WCAG 2.1 AA) */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 0%;
+  background: var(--color-emerald-accent, #10B981);
+  z-index: 100;
+  transition: width 0.1s linear;
+}
+/* Dark mode : émeraude conservé (INV-2) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .progress-bar {
+    background: var(--color-emerald-accent, #10B981);
+  }
+}
+</style>
+{% endblock %}
+
+{% block body %}
+{# US-007 : barre de progression de lecture (position: fixed — affichée en haut du viewport) #}
+<div
+    data-controller="progress-bar"
+    role="progressbar"
+    aria-valuenow="0"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    class="progress-bar"
+    style="width:0%"
+></div>
+
+<div class="main-content">
+    <div class="brief-container">
+        <div class="brief-header">
+            <h1 class="brief-title">DAILY BRIEF</h1>
+            <p class="brief-timestamp">
+                <time>LAST UPDATED {{ viewModel.lastUpdatedFormatted }}</time>
+            </p>
+        </div>
+
+        {# US-006 : Featured Summary (desktop uniquement — display:none mobile) #}
+        {% if featuredSummary is not null %}
+            {% if featuredSummary.isFallback %}
+            {# Fallback : texte sans badge émeraude (INV-2 — pas d'accent émeraude si non-IA) #}
+            <section class="featured-summary featured-summary--fallback" aria-label="Synthèse éditoriale du brief">
+                <p class="featured-summary__text">{{ featuredSummary.content }}</p>
+            </section>
+            {% else %}
+            {# Nominal : badge BRIEFLY AI: émeraude (INV-2) #}
+            <section class="featured-summary" aria-label="Synthèse éditoriale du brief">
+                <div class="featured-summary__badge">
+                    <span class="material-symbols-rounded featured-summary__icon" aria-hidden="true">auto_awesome</span>
+                    <span class="ai-summary__badge-text featured-summary__badge-label">BRIEFLY AI:</span>
+                </div>
+                <p class="featured-summary__text">{{ featuredSummary.content }}</p>
+            </section>
+            {% endif %}
+        {% endif %}
+
+        <ol class="stories-list" id="brief-stories" aria-label="Les 3 histoires du jour">
+            {% for story in viewModel.stories %}
+            <li class="story-card" data-position="{{ story.position }}">
+                <span class="story-number" aria-hidden="true">{{ story.position }}</span>
+                <div class="story-body">
+                    <h2 class="story-title">{{ story.title }}</h2>
+                    <p class="story-source">{{ story.sourceName }}</p>
+
+                    {# US-005 — Badge catégorie éditoriale (WCAG 2.1 AA : libellé texte toujours présent) #}
+                    <span class="badge badge--{{ story.category.value }}" aria-label="Catégorie : {{ story.category.label() }}">{{ story.category.label() }}</span>
+
+                    {# US-004 — Condensé IA (Twig auto-escape = htmlspecialchars sur tout le contenu LLM) #}
+                    {% if story.summary is not null %}
+                        {% if story.summary.isDegraded %}
+                        {# Mode dégradé : badge neutre, pas de couleur émeraude (INV-2) #}
+                        <div class="ai-summary ai-summary--degraded" role="region" aria-label="Résumé automatique indisponible">
+                            <div class="ai-summary__badge ai-summary__badge--degraded">
+                                <span class="ai-summary__badge-text">RÉSUMÉ AUTOMATIQUE INDISPONIBLE</span>
+                            </div>
+                            <p class="ai-summary__degraded-content">{{ story.summary.degradedContent }}</p>
+                            <p class="ai-summary__source">Source : {{ story.sourceName }}</p>
+                            <a
+                                href="{{ story.sourceUrl }}"
+                                class="ai-summary__open-link"
+                                rel="noopener noreferrer"
+                                target="_blank"
+                            >OUVRIR L'ORIGINAL</a>
+                        </div>
+                        {% else %}
+                        {# Cas nominal : badge émeraude (INV-2), puces, lien source #}
+                        <div class="ai-summary ai-summary--nominal briefly-ai-badge" role="region" aria-label="Condensé IA Briefly AI">
+                            <div class="ai-summary__badge">
+                                <span class="material-symbols-rounded ai-summary__icon" aria-hidden="true">auto_awesome</span>
+                                <span class="ai-summary__badge-text">BRIEFLY AI:</span>
+                            </div>
+                            <ul class="ai-summary__bullets summary-bullets">
+                                {% for bullet in story.summary.keyPoints %}
+                                <li class="ai-summary__bullet">{{ bullet }}</li>
+                                {% endfor %}
+                            </ul>
+                            <div class="ai-summary__footer">
+                                <p class="ai-summary__source">Source : <span>{{ story.sourceName }}</span></p>
+                                <a
+                                    href="{{ story.sourceUrl }}"
+                                    class="ai-summary__open-link"
+                                    rel="noopener noreferrer"
+                                    target="_blank"
+                                >OUVRIR L'ORIGINAL</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+
+                    <p class="story-excerpt">{{ story.excerpt }}</p>
+
+                    {# US-011 — Sélecteur de niveau de synthèse #}
+                    <div class="synthesis-level-selector" role="group" aria-label="Niveau de synthèse">
+                        <label class="level-label">Niveau :</label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{{ story.position }}" value="concise" checked aria-label="Concis (~200 mots, 3 points)">
+                            <span>Concise</span>
+                        </label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{{ story.position }}" value="detailed" aria-label="Détaillé (~500 mots, 5 points)">
+                            <span>Detailed</span>
+                        </label>
+                        <label class="level-option">
+                            <input type="radio" name="level-{{ story.position }}" value="narrative" aria-label="Narratif (~800 mots, prose éditoriale)">
+                            <span>Narrative</span>
+                        </label>
+                    </div>
+
+                    <div class="story-actions">
+                        <a
+                            href="{{ story.sourceUrl }}"
+                            class="story-link"
+                            rel="noopener noreferrer"
+                            target="_blank"
+                            aria-label="Ouvrir l'article original : {{ story.title }}"
+                        >OUVRIR L'ORIGINAL →</a>
+                        <button
+                            class="synthesis-btn"
+                            data-url="{{ story.sourceUrl }}"
+                            data-zone="synthesis-result-{{ story.position }}"
+                            data-level-group="level-{{ story.position }}"
+                            onclick="handleSynthesis(this)"
+                            aria-label="Générer une synthèse IA pour : {{ story.title }}"
+                        >GENERATE AI SUMMARY</button>
+                    </div>
+                    <div id="synthesis-result-{{ story.position }}" class="synthesis-zone" role="region" aria-live="polite" aria-label="Synthèse IA de l'article"></div>
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{# US-010 — Script JS inline pour la synthèse IA (US-010) #}
+{# Pas de bundler en Sprint 1 — JS vanilla inline. #}
+{# Action : POST /api/v1/synthesis avec l'URL de l'article. #}
+{# Aucun PII envoyé (juste l'URL de l'article — public) #}
+<script>
+async function handleSynthesis(btn) {
+  const url       = btn.dataset.url;
+  const zone      = document.getElementById(btn.dataset.zone);
+  const levelGroup = btn.dataset.levelGroup;
+  if (!url || !zone) return;
+
+  // Lire le niveau sélectionné (US-011)
+  const levelInput = levelGroup
+    ? document.querySelector(`input[name="${levelGroup}"]:checked`)
+    : null;
+  const level = levelInput ? levelInput.value : 'concise';
+
+  // Timeout adapté au niveau (concise 15s, detailed 30s, narrative 50s JS)
+  const jsTimeouts = { concise: 16000, detailed: 32000, narrative: 50000 };
+  const jsTimeout  = jsTimeouts[level] || 16000;
+
+  // Skeleton loading
+  btn.disabled = true;
+  btn.textContent = 'GENERATING…';
+  zone.innerHTML = '<div class="synthesis-skeleton" aria-busy="true">Génération en cours…</div>';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), jsTimeout);
+
+  try {
+    const resp = await fetch('/api/v1/synthesis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ url, level }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (resp.status === 401 || resp.status === 403) {
+      zone.innerHTML = '<div class="synthesis-error">Connectez-vous pour générer une synthèse IA. <a href="/login">Se connecter →</a></div>';
+      btn.textContent = 'GENERATE AI SUMMARY';
+      btn.disabled = false;
+      return;
+    }
+
+    if (resp.status === 429) {
+      zone.innerHTML = '<div class="synthesis-error">Quota épuisé — 3 synthèses gratuites utilisées aujourd\'hui.</div>';
+      btn.textContent = 'GENERATE AI SUMMARY';
+      btn.disabled = false;
+      return;
+    }
+
+    if (resp.status === 422) {
+      let msg = 'URL invalide — vérifiez le format de l\'adresse.';
+      try {
+        const errData = await resp.json();
+        if (errData && errData.detail) msg = errData.detail;
+      } catch (e) { /* ignore */ }
+      zone.innerHTML = `<div class="synthesis-error">${escHtml(msg)}</div>`;
+      btn.textContent = 'GENERATE AI SUMMARY';
+      btn.disabled = false;
+      return;
+    }
+
+    if (!resp.ok) {
+      let errorMsg = 'Service temporairement indisponible — réessayez dans quelques instants.';
+      try {
+        const errData = await resp.json();
+        if (errData && errData.detail) errorMsg = errData.detail;
+      } catch (e) { /* ignore */ }
+      zone.innerHTML = `<div class="synthesis-error">${escHtml(errorMsg)}</div>`;
+      btn.textContent = 'GENERATE AI SUMMARY';
+      btn.disabled = false;
+      return;
+    }
+
+    const data = await resp.json();
+    zone.innerHTML = renderSynthesis(data);
+    btn.textContent = '✓ SYNTHÈSE GÉNÉRÉE';
+  } catch (e) {
+    clearTimeout(timeout);
+    const isTimeout = e.name === 'AbortError';
+    zone.innerHTML = isTimeout
+      ? '<div class="synthesis-error">Délai dépassé — réessayez dans quelques instants.</div>'
+      : '<div class="synthesis-error">Service temporairement indisponible — réessayez dans quelques instants.</div>';
+    btn.textContent = 'GENERATE AI SUMMARY';
+    btn.disabled = false;
+  }
+}
+
+function renderSynthesis(data) {
+  const keyPointsHtml = (data.keyPoints || [])
+    .map(kp => `<li class="synthesis-kp">${escHtml(kp)}</li>`)
+    .join('');
+  const sourcesHtml = (data.sources || [])
+    .map(s => escHtml(s))
+    .join(', ');
+  const partialBanner = data.isPartial
+    ? '<p class="synthesis-partial">Contenu partiel — accès limité à la source</p>'
+    : '';
+  const originalUrl = data.originalUrl || '';
+  const content     = data.content || '';
+  // Badge niveau (US-011 — INV-2 accent émeraude réservé à l'IA)
+  const levelLabel  = { concise: 'Concise', detailed: 'Detailed', narrative: 'Narrative' };
+  const levelBadge  = data.level
+    ? `<span class="synthesis-level-badge">${escHtml(levelLabel[data.level] || data.level)}</span>`
+    : '';
+
+  return `<div class="synthesis-result">
+    <div class="synthesis-badge">BRIEFLY AI ${levelBadge}</div>
+    <p class="synthesis-content">${escHtml(content)}</p>
+    ${keyPointsHtml ? `<ol class="synthesis-keypoints">${keyPointsHtml}</ol>` : ''}
+    ${sourcesHtml ? `<p class="synthesis-sources">Sources : ${sourcesHtml}</p>` : ''}
+    ${partialBanner}
+    ${originalUrl ? `<a href="${escHtml(originalUrl)}" class="synthesis-original-link" rel="noopener noreferrer" target="_blank">OUVRIR L'ORIGINAL →</a>` : ''}
+  </div>`;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+</script>
+
+{# US-007 — Script JS inline de la barre de progression de lecture #}
+{# Implémente le Stimulus controller progress-bar en JS vanilla (Sprint 1). #}
+{# Sprint 2+ : remplacé par assets/controllers/progress-bar_controller.js #}
+<script>
+(function () {
+  var bar = document.querySelector('[data-controller="progress-bar"]');
+  if (!bar) return;
+
+  var rafId = null;
+  var lastRun = 0;
+  var THROTTLE_MS = 50;
+
+  function update() {
+    var scrollTop = window.scrollY !== undefined ? window.scrollY : document.documentElement.scrollTop;
+    var maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+
+    var pct;
+    if (maxScroll <= 0) {
+      // Page non-scrollable : contenu tenant dans le viewport → 100%
+      pct = 100;
+    } else {
+      pct = Math.round(Math.min(100, Math.max(0, (scrollTop / maxScroll) * 100)));
+    }
+
+    bar.style.width = pct + '%';
+    bar.setAttribute('aria-valuenow', String(pct));
+  }
+
+  function onScroll() {
+    var now = Date.now();
+    if (now - lastRun < THROTTLE_MS) return;
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(function () {
+      rafId = null;
+      lastRun = Date.now();
+      update();
+    });
+  }
+
+  function onTurboLoad() {
+    bar.style.width = '0%';
+    bar.setAttribute('aria-valuenow', '0');
+  }
+
+  // Calcul initial
+  update();
+
+  document.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('turbo:load', onTurboLoad);
+})();
+</script>
+{% endblock %}

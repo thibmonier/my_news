@@ -1,0 +1,116 @@
+{#
+  brief/error.html.twig — Page d'erreur 503 (US-001 scénario erreur 2 + OWASP #7).
+
+  Affiché quand PostgreSQL est inaccessible.
+  Status HTTP : 503 Service Unavailable + header Retry-After: 60.
+
+  OWASP #7 : Message générique, AUCUN détail technique, aucune stacktrace.
+  RGPD : Aucun PII rendu.
+#}
+{% extends 'base.html.twig' %}
+
+{% block title %}Service indisponible — Briefly AI{% endblock %}
+
+{% block header %}
+<header class="site-header" role="banner">
+    <nav class="nav-container" aria-label="Navigation principale">
+        <a href="/brief" class="logo" aria-label="Briefly AI — accueil">BRIEFLY</a>
+    </nav>
+</header>
+{% endblock %}
+
+{% block footer %}
+<footer class="site-footer" role="contentinfo">
+    <p>© Briefly AI — fort signal, faible bruit, ton éditorial.</p>
+</footer>
+{% endblock %}
+
+{% block stylesheets %}
+<style>
+/* ── Page brief — erreur 503 ─────────────────────────────────────────────────── */
+.skip-link { position: absolute; top: -3rem; left: 0;
+    background: var(--color-primary, #091426); color: #fff;
+    padding: .5rem 1rem; z-index: 999; text-decoration: none;
+    font-family: var(--font-meta); font-size: .875rem; font-weight: 600;
+    border-radius: 0 0 4px 0; }
+.skip-link:focus { top: 0; }
+*:focus-visible { outline: 2px solid var(--color-primary, #091426); outline-offset: 2px; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  line-height: var(--lh-body-md);
+  min-height: 100vh;
+}
+.site-header {
+  background-color: var(--color-primary-container);
+  padding: 1rem var(--space-gutter);
+  border-bottom: 1px solid var(--color-surface-border);
+}
+.nav-container {
+  max-width: var(--browse-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+}
+.logo {
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--color-on-primary);
+  text-decoration: none;
+  font-weight: 700;
+}
+.main-content {
+  max-width: var(--browse-max);
+  margin: 0 auto;
+  padding: var(--space-stack-lg) var(--space-gutter);
+}
+.brief-container { max-width: var(--read-max); }
+.error-state {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius);
+  padding: var(--space-stack-lg);
+  text-align: center;
+}
+.error-state h1 {
+  font-family: var(--font-meta);
+  font-size: var(--fs-headline-xl);
+  line-height: var(--lh-headline-xl);
+  letter-spacing: var(--ls-headline);
+  color: var(--color-on-surface);
+  font-weight: 700;
+  margin-bottom: var(--space-stack-md);
+}
+.error-state p {
+  color: var(--color-outline);
+  margin-bottom: var(--space-stack-md);
+}
+.error-state a {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.site-footer {
+  padding: var(--space-stack-lg) var(--space-gutter) var(--space-stack-md);
+  text-align: center;
+  font-family: var(--font-meta);
+  font-size: var(--fs-label);
+  color: var(--color-outline);
+  border-top: 1px solid var(--color-surface-border);
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="main-content">
+    <div class="brief-container">
+        <div class="error-state" role="alert">
+            <h1>Service temporairement indisponible</h1>
+            <p>Nous rencontrons des difficultés techniques. Veuillez réessayer dans quelques instants.</p>
+            <a href="/brief">Actualiser la page</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

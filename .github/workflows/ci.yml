@@ -69,7 +69,9 @@ jobs:
 
       # ── Étape 2 : Installation ───────────────────────────────────────────────
       - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+        # --no-scripts : aligne le CI sur le Dockerfile ; l'event auto-scripts
+        # appelle symfony-cmd (fourni par symfony/flex, non requis) -> exit 127.
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
 
       # ── Étape 3 : Code style (bloquant CI — tech-spec §13.4) ────────────────
       - name: PHP CS Fixer (dry-run)
@@ -82,6 +84,15 @@ jobs:
       # ── Étape 5 : Architecture hexagonale (bloquant CI) ─────────────────────
       - name: Deptrac — vérification des couches
         run: vendor/bin/deptrac analyse --no-progress
+
+      # ── Étape 5b : Schéma de la base de test (migrations Doctrine) ───────────
+      - name: Migrations base de test
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_here
+          DATABASE_URL: postgresql://briefly:briefly@127.0.0.1:5432/briefly_test?serverVersion=16&charset=utf8
+          REDIS_URL: redis://127.0.0.1:6379
+        run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
       # ── Étape 6 : Tests (Unit + Feature) ────────────────────────────────────
       - name: Pest — suite complète

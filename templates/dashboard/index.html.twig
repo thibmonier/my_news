@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Tableau de bord — Briefly AI{% endblock %}
+
+{% block header %}
+<header class="site-header">
+    <a href="/" class="logo-link" aria-label="Briefly AI — accueil">BRIEFLY AI</a>
+    <nav class="app-nav" aria-label="Navigation principale">
+        <a href="/dashboard" aria-current="page">Tableau de bord</a>
+        <a href="/brief">Mon brief</a>
+        <a href="/logout">Se déconnecter</a>
+    </nav>
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Basculer le thème clair/sombre">
+        <span aria-hidden="true">◐</span> Thème
+    </button>
+</header>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% for message in app.flashes('success') %}
+        <div class="flash flash--success" role="status">{{ message }}</div>
+    {% endfor %}
+
+    <h1>Tableau de bord</h1>
+    <p>Bienvenue sur <strong>Briefly AI</strong> — votre agrégateur de news intelligent.</p>
+    <p>Votre Daily Brief quotidien vous attend :</p>
+    <a href="/brief" class="btn btn--primary" style="width:auto;">Lire mon brief</a>
+</div>
+{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .app-nav { display: flex; gap: var(--space-gutter); }
+    .app-nav a { color: var(--color-on-surface-variant); text-decoration: none; font-family: var(--font-meta); }
+    .app-nav a:hover, .app-nav a[aria-current="page"] { color: var(--color-on-surface); }
+    /* Flash succès : vert « secondary » Stitch (INV-2 : émeraude réservée à l'IA) */
+    .flash--success {
+        background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-surface-card));
+        color: var(--color-secondary); border: 1px solid var(--color-secondary);
+        padding: .75rem 1rem; border-radius: var(--radius); margin: var(--space-stack-md) 0;
+    }
+    .container p { color: var(--color-on-surface-variant); }
+</style>
+{% endblock %}

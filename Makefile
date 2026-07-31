@@ -10,7 +10,7 @@ CONSOLE = $(PHP) bin/console
 VENDOR_BIN = $(EXEC_APP) vendor/bin
 
 .PHONY: help up down build install sh \
-        test phpstan deptrac cs cs-fix \
+        test phpstan deptrac cs cs-fix tokens \
         migrate migrate-diff migrate-rollback \
         cache-clear db-create db-drop
 
@@ -86,6 +86,9 @@ audit: ## Audit de sécurité des dépendances Composer
 	$(COMPOSER) audit
 
 quality: cs phpstan deptrac audit ## Exécute tous les contrôles qualité
+
+tokens: ## Publie les design tokens Stitch vers public/css (source: project-management/design)
+	cp project-management/design/design-tokens.css public/css/tokens.css
 
 # ── Base de données ───────────────────────────────────────────────────────────
 
