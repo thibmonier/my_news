@@ -18,6 +18,8 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
     PHP_INI_SCAN_DIR=":$PHP_INI_DIR/app.conf.d"
 
 # Dépendances système + extensions PHP
+# Versions apk non pinées : image de base Alpine maîtrisée, pin trop fragile.
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
         acl \
         bash \
