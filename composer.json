@@ -10,7 +10,6 @@
         "ext-pdo": "*",
         "ext-redis": "*",
         "api-platform/symfony": "^4.3",
-        "debril/feed-io": "^6.0",
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.2",
@@ -18,6 +17,7 @@
         "knpuniversity/oauth2-client-bundle": "^2.20",
         "league/oauth2-github": "^3.1",
         "league/oauth2-google": "^5.0",
+        "php-feed-io/feed-io": "^6.0",
         "predis/predis": "^2.3",
         "symfony/cache": "^8.0",
         "symfony/console": "^8.0",
@@ -92,9 +92,6 @@
             "pestphp/pest-plugin": true
         },
         "sort-packages": true,
-        "audit": {
-            "abandoned": "report"
-        },
         "platform": {
             "php": "8.5"
         }
