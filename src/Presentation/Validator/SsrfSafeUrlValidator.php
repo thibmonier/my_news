@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Validator;
 
+use App\Domain\Security\PrivateNetworkGuard;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -61,7 +62,8 @@ final class SsrfSafeUrlValidator extends ConstraintValidator
             return;
         }
 
-        $host = strtolower($parsed['host']);
+        // Strip des crochets IPv6 littéraux ([::1] → ::1) pour la validation IP.
+        $host = strtolower(trim($parsed['host'], '[]'));
 
         if ('' === $host) {
             $this->context->buildViolation($constraint->messageEmptyHost)->addViolation();
@@ -78,7 +80,7 @@ final class SsrfSafeUrlValidator extends ConstraintValidator
 
         // Règle 3 : si le host est directement une IP, vérifier qu'elle n'est pas privée
         if ($this->isIpAddress($host)) {
-            if ($this->isBlockedIpv4($host)) {
+            if (PrivateNetworkGuard::isBlocked($host)) {
                 $this->context->buildViolation($constraint->messageSsrfBlocked)->addViolation();
 
                 return;
@@ -92,7 +94,7 @@ final class SsrfSafeUrlValidator extends ConstraintValidator
         // gethostbyname() retourne le hostname si résolution impossible
         $resolvedIp = gethostbyname($host);
 
-        if ($resolvedIp !== $host && $this->isBlockedIpv4($resolvedIp)) {
+        if ($resolvedIp !== $host && PrivateNetworkGuard::isBlocked($resolvedIp)) {
             $this->context->buildViolation($constraint->messageSsrfBlocked)->addViolation();
         }
     }
@@ -100,21 +102,5 @@ final class SsrfSafeUrlValidator extends ConstraintValidator
     private function isIpAddress(string $host): bool
     {
         return false !== filter_var($host, \FILTER_VALIDATE_IP);
-    }
-
-    private function isBlockedIpv4(string $ip): bool
-    {
-        if (false === filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
-            // IPv6 ::1 (loopback) — vérification simple
-            return '::1' === $ip || str_starts_with($ip, 'fe80:'); // link-local IPv6
-        }
-
-        // RFC-1918 (privé) + RFC-5735 (réservé : loopback, link-local/metadata, 0.0.0.0/8)
-        if (false === filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
-            return true;
-        }
-
-        // CGNAT RFC-6598 — non couvert par NO_RES_RANGE
-        return str_starts_with($ip, '100.64.');
     }
 }

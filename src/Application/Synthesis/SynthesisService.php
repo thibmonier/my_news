@@ -13,6 +13,7 @@ use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisResponse;
 use App\Domain\Synthesis\SynthesisResponseWithCacheStatus;
 use App\Domain\Synthesis\SynthesisResult;
+use App\Domain\Security\PrivateNetworkGuard;
 use App\Domain\Synthesis\SynthesisResultRepositoryInterface;
 use App\Domain\Synthesis\SynthesisServiceInterface;
 use App\Domain\Synthesis\SynthesisUnavailableException;
@@ -206,7 +207,8 @@ final class SynthesisService implements SynthesisServiceInterface
             throw new InvalidSynthesisUrlException('URL invalide — vérifiez le format de l\'adresse');
         }
 
-        $host = $parsed['host'] ?? '';
+        // Strip des crochets IPv6 littéraux ([::1] → ::1) avant toute vérification.
+        $host = trim($parsed['host'] ?? '', '[]');
 
         // Étape 3 — Rejet des hostnames loopback explicites
         if ('localhost' === $host || '127.0.0.1' === $host || '::1' === $host) {
@@ -232,24 +234,16 @@ final class SynthesisService implements SynthesisServiceInterface
     }
 
     /**
-     * Vérifie qu'une IP n'est pas dans une plage privée RFC 1918 ou réservée.
+     * Vérifie qu'une IP n'est pas privée, réservée ou interne (anti-SSRF).
      *
-     * Utilise FILTER_FLAG_NO_PRIV_RANGE + FILTER_FLAG_NO_RES_RANGE pour exclure :
-     * - RFC 1918 : 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-     * - Loopback : 127.0.0.0/8, ::1
-     * - Adresses réservées (IANA)
+     * Délègue à PrivateNetworkGuard (source unique partagée avec SsrfSafeUrlValidator) :
+     * RFC-1918, RFC-5735, CGNAT RFC-6598, IPv6 loopback/link-local/ULA et IPv4-mapped.
      *
      * @throws InvalidSynthesisUrlException si l'IP est privée ou réservée
      */
     private function assertPublicIp(string $ip): void
     {
-        $isPublic = filter_var(
-            $ip,
-            \FILTER_VALIDATE_IP,
-            \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE,
-        );
-
-        if (false === $isPublic) {
+        if (PrivateNetworkGuard::isBlocked($ip)) {
             throw new InvalidSynthesisUrlException('URL invalide — vérifiez le format de l\'adresse');
         }
     }
