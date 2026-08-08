@@ -189,6 +189,16 @@ final class DoctrineArticleRepository implements ArticleRepositoryInterface
         );
     }
 
+    public function findUrlById(string $id): ?string
+    {
+        $url = $this->connection->fetchOne(
+            'SELECT url FROM articles WHERE id = :id',
+            ['id' => $id],
+        );
+
+        return is_string($url) ? $url : null;
+    }
+
     /** @return non-negative-int */
     public function countAll(): int
     {

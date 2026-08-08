@@ -80,4 +80,11 @@ interface ArticleRepositoryInterface
      * @return non-negative-int
      */
     public function countAll(): int;
+
+    /**
+     * Retourne l'URL source d'un article par son UUID, ou null s'il n'existe pas.
+     *
+     * @param string $id UUID v4 de l'article
+     */
+    public function findUrlById(string $id): ?string;
 }

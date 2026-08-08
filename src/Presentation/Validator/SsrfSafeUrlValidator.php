@@ -25,37 +25,6 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
  */
 final class SsrfSafeUrlValidator extends ConstraintValidator
 {
-    /**
-     * Blocs CIDR d'adresses privées/réservées RFC-1918 + RFC-5735 (IPv4).
-     * Vérification par préfixe pour éviter une dépendance à ip2long.
-     *
-     * @var array<string, string> [prefix => description]
-     */
-    private const BLOCKED_PREFIXES_IPV4 = [
-        '10.' => 'RFC-1918 Class A private',
-        '172.16.' => 'RFC-1918 Class B private',
-        '172.17.' => 'RFC-1918 Class B private',
-        '172.18.' => 'RFC-1918 Class B private',
-        '172.19.' => 'RFC-1918 Class B private',
-        '172.20.' => 'RFC-1918 Class B private',
-        '172.21.' => 'RFC-1918 Class B private',
-        '172.22.' => 'RFC-1918 Class B private',
-        '172.23.' => 'RFC-1918 Class B private',
-        '172.24.' => 'RFC-1918 Class B private',
-        '172.25.' => 'RFC-1918 Class B private',
-        '172.26.' => 'RFC-1918 Class B private',
-        '172.27.' => 'RFC-1918 Class B private',
-        '172.28.' => 'RFC-1918 Class B private',
-        '172.29.' => 'RFC-1918 Class B private',
-        '172.30.' => 'RFC-1918 Class B private',
-        '172.31.' => 'RFC-1918 Class B private',
-        '192.168.' => 'RFC-1918 Class C private',
-        '127.' => 'loopback',
-        '169.254.' => 'link-local (cloud metadata)',
-        '0.' => 'reserved',
-        '100.64.' => 'shared address space RFC-6598',
-    ];
-
     /** Hostnames toujours bloqués (résolvent vers loopback ou sont des alias). */
     private const BLOCKED_HOSTNAMES = ['localhost', 'ip6-localhost', 'ip6-loopback'];
 
@@ -140,12 +109,12 @@ final class SsrfSafeUrlValidator extends ConstraintValidator
             return '::1' === $ip || str_starts_with($ip, 'fe80:'); // link-local IPv6
         }
 
-        foreach (array_keys(self::BLOCKED_PREFIXES_IPV4) as $prefix) {
-            if (str_starts_with($ip, $prefix)) {
-                return true;
-            }
+        // RFC-1918 (privé) + RFC-5735 (réservé : loopback, link-local/metadata, 0.0.0.0/8)
+        if (false === filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
+            return true;
         }
 
-        return false;
+        // CGNAT RFC-6598 — non couvert par NO_RES_RANGE
+        return str_starts_with($ip, '100.64.');
     }
 }

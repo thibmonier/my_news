@@ -8,7 +8,7 @@ namespace App\Domain\Quota;
  * Exception levée quand le service de quota Redis est inaccessible.
  *
  * Levée par RedisQuotaCounter (Infrastructure) et remontée jusqu'au
- * QuotaStateProcessor (Presentation) qui retourne HTTP 503 (fail-safe).
+ * les State Processors de synthèse (Presentation) qui retournent HTTP 503 (fail-safe).
  *
  * Fail-safe (US-033 scénario erreur 2) :
  * Redis KO → HTTP 503, aucune synthèse générée, aucun bypass du quota.

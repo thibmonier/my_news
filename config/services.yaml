@@ -135,16 +135,9 @@ services:
         alias: App\Infrastructure\Quota\RedisQuotaCounter
 
     # Port UserUuidResolverInterface (Application) → SecurityUserUuidResolver (Infrastructure).
-    # Découple QuotaStateProcessor et QuotaController de Symfony Security (deptrac + testabilité).
+    # Découple les State Processors de synthèse et QuotaController de Symfony Security (deptrac + testabilité).
     App\Application\Quota\UserUuidResolverInterface:
         alias: App\Infrastructure\User\SecurityUserUuidResolver
-
-    # ── QuotaStateProcessor (US-033) — décorateur du processor de synthèse ───
-    # Pattern décorateur : QuotaStateProcessor (outer) → SynthesisStubProcessor (inner).
-    # Sprint 1 : SynthesisStubProcessor est le placeholder d'US-010 (Mistral).
-    App\Presentation\StateProcessor\QuotaStateProcessor:
-        arguments:
-            $innerProcessor: '@App\Presentation\StateProcessor\SynthesisStubProcessor'
 
     # ── US-010 : Synthèse IA réelle via Mistral ──────────────────────────────
 
