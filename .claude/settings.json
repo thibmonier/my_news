@@ -1,16 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-4-6",
     "CLAUDE_CODE_FORK_SUBAGENT": "1"
   },
-
-  "spinnerVerbs": {
-    "mode": "replace",
-    "verbs": ["Thinking", "Processing", "Analyzing", "Working", "Editing", "Writing", "Reading", "Running", "Delegating"]
-  },
-
   "permissions": {
     "allow": [
       "Read",
@@ -46,11 +39,7 @@
       "Read(**/*credentials*)"
     ]
   },
-
   "model": "claude-opus-4-8",
-
-  "plansDirectory": ".claude/plans",
-
   "hooks": {
     "PreCompact": [
       {
@@ -129,5 +118,23 @@
         ]
       }
     ]
+  },
+  "spinnerVerbs": {
+    "mode": "replace",
+    "verbs": [
+      "Thinking",
+      "Processing",
+      "Analyzing",
+      "Working",
+      "Editing",
+      "Writing",
+      "Reading",
+      "Running",
+      "Delegating"
+    ]
+  },
+  "plansDirectory": ".claude/plans",
+  "enabledPlugins": {
+    "ponytail@ponytail": true
   }
 }

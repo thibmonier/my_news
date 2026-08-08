@@ -1,9 +1,9 @@
 ---
 name: quality-tools
-description: Quality Tools - ESLint, TypeScript, Prettier. Use when setting up quality tools or CI.
+description: Outils de qualité - Atoll Tourisme. Use when setting up quality tools or CI.
 ---
 
-# Quality Tools - ESLint, TypeScript, Prettier
+# Outils de qualité - Atoll Tourisme
 
 This skill provides guidelines and best practices.
 
