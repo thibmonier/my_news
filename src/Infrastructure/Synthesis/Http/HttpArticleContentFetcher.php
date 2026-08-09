@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Synthesis\Http;
 
+use App\Domain\Security\PrivateNetworkGuard;
 use App\Domain\Synthesis\ArticleContentFetcherInterface;
 use App\Domain\Synthesis\FetchedContent;
 use App\Domain\Synthesis\SynthesisUnavailableException;
@@ -49,12 +50,20 @@ final class HttpArticleContentFetcher implements ArticleContentFetcherInterface
      */
     public function fetchContent(string $url): FetchedContent
     {
+        // Anti DNS rebinding (TOCTOU) : on résout le host UNE fois, on valide l'IP,
+        // et on épingle cette IP pour la connexion (option `resolve` = curl --resolve).
+        // La validation et la connexion utilisent donc la même résolution — aucun
+        // intervalle exploitable entre le contrôle SSRF et le fetch réel.
+        [$host, $pinnedIp] = $this->resolveAndValidate($url);
+
         try {
             $response = $this->httpClient->request(
                 'GET',
                 $url,
                 [
                     'timeout' => self::TIMEOUT,
+                    'max_redirects' => 0, // pas de suivi auto : un redirect pourrait pointer vers une IP interne non épinglée
+                    'resolve' => [$host => $pinnedIp],
                     'headers' => [
                         'User-Agent' => self::USER_AGENT,
                         'Accept' => 'text/html,application/xhtml+xml,*/*',
@@ -105,6 +114,41 @@ final class HttpArticleContentFetcher implements ArticleContentFetcherInterface
 
             throw new SynthesisUnavailableException('Article content fetch error: ' . $e->getMessage(), $e);
         }
+    }
+
+    /**
+     * Résout le host de l'URL une seule fois, valide l'IP contre les plages
+     * privées/réservées (défense en profondeur SSRF, OWASP A01) et retourne le
+     * couple [host, ip] à épingler pour la connexion.
+     *
+     * @throws SynthesisUnavailableException si le host est absent, non résoluble,
+     *                                       ou pointe vers une ressource interne
+     *
+     * @return array{0: string, 1: string} [host, ip résolue]
+     */
+    private function resolveAndValidate(string $url): array
+    {
+        $host = parse_url($url, \PHP_URL_HOST);
+
+        if (!\is_string($host) || '' === $host) {
+            throw new SynthesisUnavailableException('Article URL has no resolvable host');
+        }
+
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            $ip = $host;
+        } else {
+            $ip = gethostbyname($host);
+
+            if ($ip === $host) {
+                throw new SynthesisUnavailableException('Article host could not be resolved');
+            }
+        }
+
+        if (PrivateNetworkGuard::isBlocked($ip)) {
+            throw new SynthesisUnavailableException('Article host resolves to a blocked (internal) address');
+        }
+
+        return [$host, $ip];
     }
 
     /**
