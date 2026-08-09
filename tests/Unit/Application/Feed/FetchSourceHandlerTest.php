@@ -205,6 +205,11 @@ function articleRepoStub(array $saveResults = []): ArticleRepositoryInterface
             return 0;
         }
 
+        public function findUrlById(string $id): ?string
+        {
+            return null;
+        }
+
         public function getInsertedCount(): int
         {
             return $this->inserted;
@@ -383,6 +388,11 @@ test('handler catchée RuntimeException de SimHashService et continue (US-022 sc
         public function countAll(): int
         {
             return 0;
+        }
+
+        public function findUrlById(string $id): ?string
+        {
+            return null;
         }
     };
 
