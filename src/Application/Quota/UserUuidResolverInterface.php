@@ -7,7 +7,7 @@ namespace App\Application\Quota;
 /**
  * Port secondaire — Résolution de l'UUID de l'utilisateur courant.
  *
- * Permet à QuotaStateProcessor (Presentation) d'obtenir l'UUID de
+ * Permet aux State Processors de synthèse (Presentation) d'obtenir l'UUID de
  * l'utilisateur authentifié sans dépendre directement de Symfony Security,
  * garantissant la testabilité en unit test (stub PHP anonyme).
  *

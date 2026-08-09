@@ -1,9 +1,9 @@
 ---
 name: performance
-description: Performance Optimization - React Native. Use when optimizing performance or profiling code.
+description: Performance & Optimisation - Atoll Tourisme. Use when optimizing performance or profiling code.
 ---
 
-# Performance Optimization - React Native
+# Performance & Optimisation - Atoll Tourisme
 
 This skill provides guidelines and best practices.
 

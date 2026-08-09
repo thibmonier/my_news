@@ -6,6 +6,7 @@ namespace App\Domain\Brief;
 
 use App\Domain\Feed\Article;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Service domaine — Algorithme de sélection des 3 histoires majeures.
@@ -102,7 +103,7 @@ final class BriefSelectorService implements BriefSelectorServiceInterface
         $brief = $this->dailyBriefRepository->findForDate($date);
         if (null === $brief) {
             $brief = new DailyBrief(
-                id: $this->generateUuidV4(),
+                id: Uuid::v4()->toRfc4122(),
                 date: $date,
                 status: DailyBriefStatus::Pending,
                 updatedAt: $now,
@@ -114,7 +115,7 @@ final class BriefSelectorService implements BriefSelectorServiceInterface
         foreach ($selectedArticles as $index => $scored) {
             $position = $index + 1;
             $stories[] = new BriefStory(
-                id: $this->generateUuidV4(),
+                id: Uuid::v4()->toRfc4122(),
                 briefId: $brief->getId(),
                 articleId: $scored['article']->getId(),
                 position: $position,
@@ -169,28 +170,6 @@ final class BriefSelectorService implements BriefSelectorServiceInterface
                 'clusterId' => $article->getClusterId(),
             ];
         }, $articles);
-    }
-
-    /**
-     * Génère un UUID v4 en PHP pur, sans dépendance Symfony.
-     *
-     * RFC 4122 §4.4 : bits version (4) et variante (RFC 4122) positionnés.
-     */
-    private function generateUuidV4(): string
-    {
-        $bytes = random_bytes(16);
-        $bytes[6] = \chr((\ord($bytes[6]) & 0x0F) | 0x40); // version 4
-        $bytes[8] = \chr((\ord($bytes[8]) & 0x3F) | 0x80); // variante RFC 4122
-        $hex = bin2hex($bytes);
-
-        return \sprintf(
-            '%s-%s-%s-%s-%s',
-            substr($hex, 0, 8),
-            substr($hex, 8, 4),
-            substr($hex, 12, 4),
-            substr($hex, 16, 4),
-            substr($hex, 20, 12),
-        );
     }
 
     /**

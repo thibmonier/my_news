@@ -7,7 +7,7 @@ namespace App\Domain\User;
 /**
  * Interface Domain — Utilisateur portant un UUID interne.
  *
- * Permet à la couche Presentation (QuotaStateProcessor, etc.) d'obtenir
+ * Permet à la couche Presentation (State Processors de synthèse, etc.) d'obtenir
  * l'UUID de l'utilisateur connecté sans dépendre de DoctrineUserEntity
  * (couche Infrastructure), garantissant la conformité deptrac.
  *

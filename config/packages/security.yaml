@@ -47,6 +47,10 @@ security:
         main:
             lazy: true
             provider: app_users
+            # Anti brute-force sur /login (OWASP A07) — 5 tentatives / 15 min par IP+username.
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
             entry_point: App\Presentation\Security\ApiAuthenticationEntryPoint
             form_login:
                 login_path: /login

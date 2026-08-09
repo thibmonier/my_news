@@ -6,7 +6,7 @@ namespace App\Presentation\ApiResource;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Post;
-use App\Presentation\StateProcessor\QuotaStateProcessor;
+use App\Presentation\StateProcessor\ArticleSynthesisProcessor;
 use App\Presentation\StateProcessor\UrlSynthesisProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -15,10 +15,10 @@ use Symfony\Component\Validator\Constraints as Assert;
  *
  * Deux opérations :
  *
- * 1. POST /api/v1/articles/{id}/synthesize  [US-033 Walking Skeleton]
+ * 1. POST /api/v1/articles/{id}/synthesize  [US-033 + US-010]
  *    Input : ID article depuis le template URI
- *    Output: synthèse stub "BRIEFLY AI:" + quota utilisé/restant
- *    Processor: QuotaStateProcessor → SynthesisStubProcessor (Sprint 1 placeholder)
+ *    Output: synthèse Mistral "BRIEFLY AI:" (niveau concise) + quota utilisé/restant
+ *    Processor: ArticleSynthesisProcessor (résout ID → URL, Mistral réel, quota intégré)
  *
  * 2. POST /api/v1/synthesis  [US-010 Mistral réel + US-011 multi-niveaux]
  *    Input : corps JSON { "url": "https://...", "level": "concise|detailed|narrative" }
@@ -36,11 +36,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     routePrefix: '/api/v1',
     operations: [
-        // ── US-033 : synthèse stub par ID d'article ────────────────────────────
+        // ── US-033 + US-010 : synthèse Mistral par ID d'article ───────────────
         // Auth : ROLE_USER enforced at firewall level (access_control security.yaml).
         new Post(
             uriTemplate: '/articles/{id}/synthesize',
-            processor: QuotaStateProcessor::class,
+            processor: ArticleSynthesisProcessor::class,
             output: SynthesisResource::class,
         ),
         // ── US-010 / US-011 : synthèse Mistral réelle par URL + niveau ─────────
