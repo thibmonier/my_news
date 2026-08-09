@@ -196,7 +196,7 @@ final class DoctrineArticleRepository implements ArticleRepositoryInterface
             ['id' => $id],
         );
 
-        return is_string($url) ? $url : null;
+        return \is_string($url) ? $url : null;
     }
 
     /** @return non-negative-int */

@@ -77,7 +77,7 @@ final class PrivateNetworkGuard
 
         // CGNAT RFC-6598 : 100.64.0.0/10 = 100.64.0.0 – 100.127.255.255
         // (non couvert par NO_RES_RANGE ; comparaison sur entier non signé)
-        $long = sprintf('%u', ip2long($ip));
+        $long = \sprintf('%u', ip2long($ip));
 
         return $long >= 1681915904 && $long <= 1686110207;
     }

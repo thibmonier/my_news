@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Synthesis;
 
+use App\Domain\Security\PrivateNetworkGuard;
 use App\Domain\Synthesis\ArticleContentFetcherInterface;
 use App\Domain\Synthesis\InvalidSynthesisUrlException;
 use App\Domain\Synthesis\MistralClientInterface;
@@ -13,7 +14,6 @@ use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisResponse;
 use App\Domain\Synthesis\SynthesisResponseWithCacheStatus;
 use App\Domain\Synthesis\SynthesisResult;
-use App\Domain\Security\PrivateNetworkGuard;
 use App\Domain\Synthesis\SynthesisResultRepositoryInterface;
 use App\Domain\Synthesis\SynthesisServiceInterface;
 use App\Domain\Synthesis\SynthesisUnavailableException;

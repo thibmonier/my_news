@@ -131,7 +131,7 @@ function articleRepositoryStub(?string $url, string $knownId = 'article-123'): A
             return null;
         }
 
-        public function findPotentialDuplicates(int $simhash, \DateTimeImmutable $publishedAt, int $threshold): array
+        public function findPotentialDuplicates(int $simhash, DateTimeImmutable $publishedAt, int $threshold): array
         {
             return [];
         }
