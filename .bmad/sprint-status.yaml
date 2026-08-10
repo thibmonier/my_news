@@ -21,34 +21,35 @@ sprints:
     name: sprint-004-monetisation
     slug: monetisation
     goal: "Transformer le placeholder quota en Premium réel : Stripe Checkout, quota gratuit HTTP 402, portail client et réglages RGPD."
-    status: review
+    status: done
     dates: "2026-09-08 → 2026-09-21"
     points: 16
     tasks: 60
     hours: 73
+    merged: "PR #14 (ffbce86) — 660 tests verts, CI verte"
     stories:
       - id: US-034a
         title: "Stripe Checkout + webhook subscription.created"
-        status: ready-for-dev
+        status: done
         points: 5
         tasks: 15
         depends_on: [US-030, US-033]   # livrées
         note: "Pivot du sprint — DoctrineSubscriptionRepository débloque US-013 et US-034b"
       - id: US-035
         title: "Réglages confidentialité RGPD"
-        status: ready-for-dev
+        status: done
         points: 3
         tasks: 14
         depends_on: []                 # indépendante (parallélisable J1)
       - id: US-013
         title: "Quota gratuit réel + paywall HTTP 402"
-        status: ready-for-dev
+        status: done
         points: 5
         tasks: 14
         depends_on: [US-034a]          # isPremium() via subscription
       - id: US-034b
         title: "Customer Portal + webhooks downgrade/cancel"
-        status: ready-for-dev
+        status: done
         points: 3
         tasks: 13
         depends_on: [US-034a]
