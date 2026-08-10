@@ -1,0 +1,59 @@
+# BMAD Sprint Status — source de vérité pour l'orchestration de sprint
+# Généré pour le Sprint 4 (Monétisation Premium).
+
+current_sprint: sprint-004-monetisation
+
+sprints:
+  sprint-001-walking_skeleton:
+    status: done
+    points: 36
+    stories: [US-001, US-002, US-003, US-010, US-020, US-030, US-033]
+  sprint-002-enrichissement:
+    status: done
+    points: 23
+    stories: [US-004, US-005, US-011, US-021, US-031]
+  sprint-003-consolidation:
+    status: done
+    points: 16
+    stories: [US-006, US-007, US-012, US-022, US-032]
+
+  sprint-004-monetisation:
+    name: sprint-004-monetisation
+    slug: monetisation
+    goal: "Transformer le placeholder quota en Premium réel : Stripe Checkout, quota gratuit HTTP 402, portail client et réglages RGPD."
+    status: ready
+    dates: "2026-09-08 → 2026-09-21"
+    points: 16
+    tasks: 60
+    hours: 73
+    stories:
+      - id: US-034a
+        title: "Stripe Checkout + webhook subscription.created"
+        status: ready-for-dev
+        points: 5
+        tasks: 15
+        depends_on: [US-030, US-033]   # livrées
+        note: "Pivot du sprint — DoctrineSubscriptionRepository débloque US-013 et US-034b"
+      - id: US-035
+        title: "Réglages confidentialité RGPD"
+        status: ready-for-dev
+        points: 3
+        tasks: 14
+        depends_on: []                 # indépendante (parallélisable J1)
+      - id: US-013
+        title: "Quota gratuit réel + paywall HTTP 402"
+        status: ready-for-dev
+        points: 5
+        tasks: 14
+        depends_on: [US-034a]          # isPremium() via subscription
+      - id: US-034b
+        title: "Customer Portal + webhooks downgrade/cancel"
+        status: ready-for-dev
+        points: 3
+        tasks: 13
+        depends_on: [US-034a]
+    waves:
+      - [US-034a, US-035]              # vague 1 (parallèle)
+      - [US-013, US-034b]              # vague 2 (après le pivot US-034a)
+    external_prereqs:
+      - "Clés Stripe test (STRIPE_SECRET_KEY sk_test_, STRIPE_WEBHOOK_SECRET whsec_test_) requises pour les WebTestCase US-034a/b"
