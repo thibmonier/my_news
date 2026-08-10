@@ -19,35 +19,39 @@ use App\Presentation\ApiResource\SynthesisResource;
 use App\Presentation\EventSubscriber\SynthesisCacheHeaderSubscriber;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
-use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * State Processor — Génération de synthèse IA réelle via Mistral (US-010 + US-011).
+ * State Processor — Génération de synthèse IA réelle via Mistral (US-010 + US-011 + US-013).
  *
  * Route : POST /api/v1/synthesis
  * Input : corps JSON { "url": "https://...", "level": "concise|detailed|narrative" }
  *
  * Flux :
  * 1. Identifier l'utilisateur (UserUuidResolverInterface)
- * 2. Vérifier / consommer le quota (QuotaService — US-033 intégré)
- * 3. Extraire l'URL + le niveau depuis le corps de la requête
- * 4. Déléguer à SynthesisServiceInterface (validation SSRF + fetch + Mistral + persistence)
- * 5. Retourner SynthesisResource enrichie avec level + badge
+ * 2. Log WARNING si header X-Date présent (tentative de manipulation de date)
+ * 3. Bypass Premium OU Quota check/consommation (QuotaService — US-013)
+ * 4. Extraire l'URL + le niveau depuis le corps de la requête
+ * 5. Déléguer à SynthesisServiceInterface (validation SSRF + fetch + Mistral + persistence)
+ * 6. Remboursement quota si erreur serveur IA post-débit (refund — US-013)
+ * 7. Retourner SynthesisResource avec X-Quota-Remaining header (Free uniquement)
  *
  * Réponses :
  *   200  synthèse "BRIEFLY AI:" avec level, keyPoints, sources, originalUrl, isPartial
+ *        + header X-Quota-Remaining: N (comptes Free seulement)
  *   401  utilisateur non authentifié (AccessDeniedException → Symfony Security)
+ *   402  quota quotidien épuisé (HttpException 402 + JSON quota_exceeded + resets_at)
  *   422  URL invalide / SSRF détecté / level inconnu (message spécifique)
- *   429  quota quotidien épuisé (TooManyRequestsHttpException + X-Quota-Remaining: 0)
  *   503  Mistral ou Redis inaccessibles (ServiceUnavailableHttpException, sans stacktrace)
- *        Narrative timeout → message "Synthèse Narrative indisponible — essayez le niveau Detailed"
  *
  * Sécurité :
  * - Quota consommé AVANT appel Mistral (pas de bypass possible)
+ * - Date quota = UTC serveur — header X-Date client ignoré + loggué en WARNING
  * - url_hash loggué en cas d'erreur (jamais l'URL brute ni l'UUID utilisateur — RGPD)
  * - Réponse 503 générique sans détail technique (OWASP A05)
  * - Validation level : whitelist enum stricte via SynthesisLevel::fromString() (T-011-06)
@@ -58,6 +62,9 @@ use Symfony\Component\Uid\Uuid;
  */
 final class UrlSynthesisProcessor implements ProcessorInterface
 {
+    /** Clé de l'attribut de requête pour X-Quota-Remaining (lu par QuotaSubscriber). */
+    public const QUOTA_REMAINING_ATTRIBUTE = 'quota_remaining';
+
     public function __construct(
         private readonly SynthesisServiceInterface $synthesisService,
         private readonly QuotaService $quotaService,
@@ -74,7 +81,7 @@ final class UrlSynthesisProcessor implements ProcessorInterface
      *
      * @throws AccessDeniedException si l'utilisateur n'est pas authentifié
      * @throws UnprocessableEntityHttpException si URL invalide, SSRF ou level invalide (HTTP 422)
-     * @throws TooManyRequestsHttpException si quota épuisé (HTTP 429)
+     * @throws HttpException si quota épuisé (HTTP 402 Payment Required)
      * @throws ServiceUnavailableHttpException si Mistral ou Redis KO (HTTP 503)
      */
     public function process(
@@ -90,7 +97,20 @@ final class UrlSynthesisProcessor implements ProcessorInterface
             throw new AccessDeniedException('L\'utilisateur n\'est pas authentifié.');
         }
 
-        // ── 2. Extraire l'URL et le niveau depuis le corps désérialisé ──────
+        /** @var Request|null $currentRequest */
+        $currentRequest = $context['request'] ?? null;
+
+        // ── 2. Sécurité date : log WARNING si X-Date présent (manipulation tentée) ─
+        if ($currentRequest instanceof Request && $currentRequest->headers->has('X-Date')) {
+            $this->logger->warning('synthesis.quota_date_manipulation_attempt', [
+                'ip' => $currentRequest->getClientIp(),
+                'user_agent' => $currentRequest->headers->get('User-Agent'),
+                'x_date_value' => $currentRequest->headers->get('X-Date'),
+                // RGPD : UUID non loggué
+            ]);
+        }
+
+        // ── 3. Extraire l'URL et le niveau depuis le corps désérialisé ──────
         $url = $data instanceof SynthesisResource ? trim($data->url) : '';
         $levelRaw = $data instanceof SynthesisResource ? $data->level : null;
 
@@ -98,36 +118,37 @@ final class UrlSynthesisProcessor implements ProcessorInterface
             throw new UnprocessableEntityHttpException('URL invalide — vérifiez le format de l\'adresse');
         }
 
-        // ── 3. Résoudre le niveau (whitelist strict — US-011 T-011-06) ──────
-        // La validation @Assert\Choice sur SynthesisResource intercepte les valeurs
-        // inconnues en amont (HTTP 422). Ce bloc gère la construction du VO.
+        // ── 4. Résoudre le niveau (whitelist strict — US-011 T-011-06) ──────
         try {
             $level = null !== $levelRaw
                 ? SynthesisLevel::fromString($levelRaw)
                 : SynthesisLevel::CONCISE;
         } catch (InvalidSynthesisLevelException $e) {
-            // Sécurité défensive : ne devrait pas atteindre ce point si la validation
-            // @Assert\Choice est active. Géré explicitement pour robustesse.
             throw new UnprocessableEntityHttpException($e->getMessage(), $e);
         }
 
-        // ── 4. Quota check (US-033) — avant tout appel Mistral ─────────────
-        try {
-            $allowed = $this->quotaService->consumeOrDeny($userUuid);
-        } catch (QuotaServiceUnavailableException $e) {
-            $this->logger->warning('synthesis.quota_redis_ko', [
-                'context' => 'UrlSynthesisProcessor::process',
-                // RGPD : UUID non loggué
-            ]);
+        // ── 5. Quota check (US-013) — Premium bypass + Free limit ──────────
+        $isPremium = $this->quotaService->isPremium($userUuid);
 
-            throw new ServiceUnavailableHttpException(retryAfter: null, message: 'Le service est temporairement indisponible. Veuillez réessayer dans quelques instants.', previous: $e);
+        if (!$isPremium) {
+            try {
+                $allowed = $this->quotaService->consumeOrDeny($userUuid);
+            } catch (QuotaServiceUnavailableException $e) {
+                $this->logger->warning('synthesis.quota_redis_ko', [
+                    'context' => 'UrlSynthesisProcessor::process',
+                    // RGPD : UUID non loggué
+                ]);
+
+                throw new ServiceUnavailableHttpException(retryAfter: null, message: 'Le service est temporairement indisponible. Veuillez réessayer dans quelques instants.', previous: $e);
+            }
+
+            if (!$allowed) {
+                // HTTP 402 Payment Required (US-013 — remplace 429 US-033)
+                throw new HttpException(Response::HTTP_PAYMENT_REQUIRED, 'quota_exceeded', headers: ['X-Quota-Remaining' => '0', 'X-Resets-At' => $this->quotaService->nextMidnightUtcIso()]);
+            }
         }
 
-        if (!$allowed) {
-            throw new TooManyRequestsHttpException(retryAfter: null, message: 'Vous avez utilisé vos 3 synthèses gratuites aujourd\'hui.', code: 0, headers: ['X-Quota-Remaining' => '0']);
-        }
-
-        // ── 5. Synthèse IA (normalisation + SSRF + cache + Mistral + persistence) ──
+        // ── 6. Synthèse IA (normalisation + SSRF + cache + Mistral + persistence) ──
         try {
             $synthesisResult = $this->synthesisService->synthesize(new SynthesisRequest($url, $level));
         } catch (InvalidSynthesisUrlException $e) {
@@ -138,10 +159,13 @@ final class UrlSynthesisProcessor implements ProcessorInterface
                 'url_hash' => hash('sha256', $url),
                 'level' => $level->value,
                 'error' => $e->getMessage(),
-                // OWASP A05 : stack trace non loguée en WARNING/INFO
             ]);
 
-            // Message adapté au niveau Narrative (US-011 scénario erreur 2)
+            // Remboursement quota si l'utilisateur Free a été pré-débité (US-013 T-013-06)
+            if (!$isPremium) {
+                $this->quotaService->refund($userUuid);
+            }
+
             $message = SynthesisLevel::NARRATIVE === $level
                 ? 'Synthèse Narrative indisponible pour ce contenu — essayez le niveau Detailed'
                 : 'Service temporairement indisponible — réessayez dans quelques instants.';
@@ -152,12 +176,7 @@ final class UrlSynthesisProcessor implements ProcessorInterface
         $response = $synthesisResult->response;
         $cacheStatus = $synthesisResult->cacheStatus;
 
-        // ── 5b. Header X-Cache (HIT|MISS|BYPASS) via attribut de requête ────
-        // Le subscriber SynthesisCacheHeaderSubscriber lit cet attribut sur kernel.response
-        // et injecte le header HTTP correspondant dans la réponse (US-012 T-012-04).
-        /** @var Request|null $currentRequest */
-        $currentRequest = $context['request'] ?? null;
-
+        // ── 7. Header X-Cache (HIT|MISS|BYPASS) via attribut de requête ─────
         if ($currentRequest instanceof Request) {
             $currentRequest->attributes->set(
                 SynthesisCacheHeaderSubscriber::REQUEST_ATTRIBUTE,
@@ -165,17 +184,26 @@ final class UrlSynthesisProcessor implements ProcessorInterface
             );
         }
 
-        // ── 6. Quota courant post-consommation ──────────────────────────────
-        try {
-            $remaining = $this->quotaService->getRemaining($userUuid);
-            $used = $this->quotaService->getUsed($userUuid);
-        } catch (QuotaServiceUnavailableException) {
-            // Redis KO après consommation — synthèse déjà générée, répondre quand même
-            $remaining = 0;
-            $used = QuotaService::DAILY_LIMIT;
+        // ── 8. Quota courant post-consommation (Free uniquement) ─────────────
+        if (!$isPremium) {
+            try {
+                $remaining = $this->quotaService->getRemaining($userUuid);
+                $used = $this->quotaService->getUsed($userUuid);
+            } catch (QuotaServiceUnavailableException) {
+                $remaining = 0;
+                $used = QuotaService::DAILY_LIMIT;
+            }
+
+            // Header X-Quota-Remaining ajouté par QuotaSubscriber via cet attribut
+            if ($currentRequest instanceof Request) {
+                $currentRequest->attributes->set(self::QUOTA_REMAINING_ATTRIBUTE, $remaining);
+            }
+        } else {
+            $remaining = QuotaService::DAILY_LIMIT;
+            $used = 0;
         }
 
-        // ── 7. Réponse enrichie avec badge niveau (US-011 T-011-06) ─────────
+        // ── 9. Réponse enrichie avec badge niveau (US-011 T-011-06) ──────────
         return new SynthesisResource(
             id: Uuid::v4()->toRfc4122(),
             url: $url,

@@ -739,8 +739,18 @@ async function handleSynthesis(btn) {
       return;
     }
 
-    if (resp.status === 429) {
-      zone.innerHTML = '<div class="synthesis-error">Quota épuisé — 3 synthèses gratuites utilisées aujourd\'hui.</div>';
+    if (resp.status === 402) {
+      // Quota épuisé (US-013) : afficher le paywall modal
+      try {
+        const paywallResp = await fetch('/quota/paywall-modal', { headers: { Accept: 'text/html' } });
+        if (paywallResp.ok) {
+          const paywallHtml = await paywallResp.text();
+          const paywallContainer = document.createElement('div');
+          paywallContainer.innerHTML = paywallHtml;
+          document.body.appendChild(paywallContainer);
+        }
+      } catch (e) { /* ignore — fallback texte */ }
+      zone.innerHTML = '<div class="synthesis-error">Quota épuisé — 3 synthèses gratuites utilisées aujourd\'hui. <a href="/premium">Passez à Premium</a></div>';
       btn.textContent = 'GENERATE AI SUMMARY';
       btn.disabled = false;
       return;

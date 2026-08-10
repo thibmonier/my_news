@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confidentialité — Briefly AI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f5f7fa; color: #1a1a2e; min-height: 100vh; }
+        .nav { background: #1a1a2e; color: #fff; padding: 0 1.5rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; }
+        .nav .brand { font-weight: 700; font-size: 1rem; color: #fff; text-decoration: none; }
+        .nav a { color: #ccc; text-decoration: none; font-size: 0.875rem; }
+        .nav a:hover { color: #fff; }
+        .main { max-width: 640px; margin: 2rem auto; padding: 0 1.5rem; }
+        .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 2rem; margin-bottom: 1.5rem; }
+        .card h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 0.375rem; }
+        .card .subtitle { color: #6b7280; font-size: 0.875rem; margin-bottom: 1.75rem; }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid #f3f4f6; }
+        .toggle-row:last-of-type { border-bottom: none; }
+        .toggle-label { flex: 1; }
+        .toggle-label strong { display: block; font-size: 0.9rem; font-weight: 600; color: #111827; margin-bottom: 0.25rem; }
+        .toggle-label span { font-size: 0.8rem; color: #6b7280; }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; margin-left: 1rem; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: #d1d5db; border-radius: 24px; transition: background .2s; }
+        .toggle-slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+        .toggle-switch input:checked + .toggle-slider { background: #091426; }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+        .toggle-switch input:focus-visible + .toggle-slider { outline: 2px solid #091426; outline-offset: 2px; }
+        .toast { display: none; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+        .toast.visible { display: block; }
+        .btn-export { display: inline-flex; align-items: center; gap: .375rem; padding: 0.625rem 1.5rem; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background .15s; }
+        .btn-export:hover { background: #e5e7eb; }
+        .skip-link { position: absolute; top: -3rem; left: 0; background: #091426; color: #fff; padding: .5rem 1rem; z-index: 999; text-decoration: none; font-size: .875rem; font-weight: 600; border-radius: 0 0 4px 0; }
+        .skip-link:focus { top: 0; }
+        *:focus-visible { outline: 2px solid #091426; outline-offset: 2px; }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+    <nav class="nav">
+        <a class="brand" href="/dashboard">Briefly AI</a>
+        <a href="/dashboard">Tableau de bord</a>
+        <a href="/profile/edit">Mon profil</a>
+    </nav>
+
+    <main id="main-content" class="main">
+        <div id="privacy-toast" class="toast" aria-live="polite" role="status"></div>
+
+        <div class="card">
+            <h1>Confidentialité &amp; données</h1>
+            <p class="subtitle">Contrôlez finement les données que Briefly AI collecte et utilise à votre sujet.</p>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <strong>Analytique anonyme</strong>
+                    <span>Permet la collecte d'audiences anonymes (Plausible/Matomo) pour améliorer l'application.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input
+                        type="checkbox"
+                        id="analytics_opt_in"
+                        name="analytics_opt_in"
+                        role="switch"
+                        aria-checked="{{ settings.analyticsOptIn ? 'true' : 'false' }}"
+                        aria-label="Analytique anonyme"
+                        {{ settings.analyticsOptIn ? 'checked' : '' }}
+                        data-privacy-target="analyticsOptIn"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <strong>Recommandations personnalisées</strong>
+                    <span>Utilise votre historique de lecture pour personnaliser les articles suggérés.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input
+                        type="checkbox"
+                        id="personalized_recs"
+                        name="personalized_recs"
+                        role="switch"
+                        aria-checked="{{ settings.personalizedRecs ? 'true' : 'false' }}"
+                        aria-label="Recommandations personnalisées"
+                        {{ settings.personalizedRecs ? 'checked' : '' }}
+                        data-privacy-target="personalizedRecs"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <strong>Indexation par les moteurs de recherche</strong>
+                    <span>Autorise Google et autres moteurs à indexer votre profil public.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input
+                        type="checkbox"
+                        id="search_engine_indexing"
+                        name="search_engine_indexing"
+                        role="switch"
+                        aria-checked="{{ settings.searchEngineIndexing ? 'true' : 'false' }}"
+                        aria-label="Indexation par les moteurs de recherche"
+                        {{ settings.searchEngineIndexing ? 'checked' : '' }}
+                        data-privacy-target="searchEngineIndexing"
+                    >
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="font-size:1rem;font-weight:700;margin-bottom:.75rem;">Portabilité de vos données</h2>
+            <p style="font-size:.875rem;color:#6b7280;margin-bottom:1rem;">Téléchargez une copie de vos préférences de confidentialité au format JSON (RGPD Article 20).</p>
+            <a href="{{ path('app_settings_privacy_export') }}" class="btn-export" aria-label="Exporter mes données de confidentialité">
+                Exporter mes données
+            </a>
+        </div>
+    </main>
+
+    <script>
+    (function() {
+        'use strict';
+
+        var CSRF_TOKEN = {{ csrf_token|json_encode|raw }};
+        var debounceTimer = null;
+        var DEBOUNCE_MS = 800;
+
+        function saveSettings() {
+            var payload = {
+                _token: CSRF_TOKEN,
+                analytics_opt_in: document.getElementById('analytics_opt_in').checked,
+                personalized_recs: document.getElementById('personalized_recs').checked,
+                search_engine_indexing: document.getElementById('search_engine_indexing').checked
+            };
+
+            fetch('{{ path('app_settings_privacy_update') }}', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'text/vnd.turbo-stream.html' },
+                body: JSON.stringify(payload)
+            }).then(function(response) {
+                if (response.ok) {
+                    showToast('Préférences enregistrées');
+                    // Mettre à jour aria-checked
+                    document.querySelectorAll('[role="switch"]').forEach(function(el) {
+                        el.setAttribute('aria-checked', el.checked ? 'true' : 'false');
+                    });
+                }
+            }).catch(function() {
+                showToast('Erreur lors de la sauvegarde', true);
+            });
+        }
+
+        function showToast(message, isError) {
+            var toast = document.getElementById('privacy-toast');
+            toast.textContent = message;
+            toast.className = 'toast visible';
+            if (isError) { toast.style.background = '#fee2e2'; toast.style.borderColor = '#fca5a5'; toast.style.color = '#7f1d1d'; }
+            else { toast.style.background = '#d1fae5'; toast.style.borderColor = '#6ee7b7'; toast.style.color = '#065f46'; }
+            setTimeout(function() { toast.className = 'toast'; }, 3000);
+        }
+
+        document.querySelectorAll('[data-privacy-target]').forEach(function(el) {
+            el.addEventListener('change', function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(saveSettings, DEBOUNCE_MS);
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

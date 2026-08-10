@@ -82,6 +82,29 @@ final class RedisQuotaCounter implements QuotaCounterInterface
     }
 
     /**
+     * Décrémente le compteur en le plafonnant à 0 via un script Lua atomique.
+     *
+     * Lua : DECR puis SET à 0 si le résultat est négatif.
+     * Garantit l'atomicité et évite de descendre sous 0 (remboursement quota US-013).
+     *
+     * @throws QuotaServiceUnavailableException si Redis est inaccessible
+     */
+    public function decrement(string $userUuid, string $dateUtc): void
+    {
+        try {
+            $key = $this->buildKey($userUuid, $dateUtc);
+            // ponytail: script Lua atomique — upgrade vers MULTI/EXEC si throughput élévé
+            $this->redisClient->eval(
+                "local v = redis.call('DECR', KEYS[1]); if v < 0 then redis.call('SET', KEYS[1], 0) end; return math.max(0, v)",
+                1,
+                $key,
+            );
+        } catch (\Throwable $e) {
+            throw new QuotaServiceUnavailableException($e->getMessage(), $e);
+        }
+    }
+
+    /**
      * Construit la clé Redis : quota:synthesis:{uuid}:{YYYY-MM-DD}.
      *
      * Format de la clé documenté dans la tech-spec §9.1.

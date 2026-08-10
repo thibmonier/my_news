@@ -38,3 +38,5 @@ framework:
             App\Application\Feed\ValidateSource\ValidateSourceMessage: async
             # US-021 : mise à jour groupée (dispatch un FetchSourceMessage par source active)
             App\Application\Feed\BulkFetch\BulkFetchMessage: async
+            # US-034a : webhooks Stripe — traitement async (activation Premium, idempotence)
+            App\Application\Subscription\StripeWebhookMessage: async

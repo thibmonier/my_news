@@ -1,0 +1,13 @@
+## Briefly AI — Bindings de services spécifiques à l'environnement de test
+## Remplace les adapters réels par des stubs pour éviter les appels API externes
+
+services:
+    # ── Stripe — US-034a ─────────────────────────────────────────────────────
+    # En test, le gateway Stripe est remplacé par un stub qui retourne une URL fictive.
+    # Évite les appels à l'API Stripe avec une clé invalide.
+    Tests\Stub\StripeGatewayStub:
+        public: true
+
+    App\Domain\Subscription\StripeGatewayInterface:
+        alias: Tests\Stub\StripeGatewayStub
+        public: true
