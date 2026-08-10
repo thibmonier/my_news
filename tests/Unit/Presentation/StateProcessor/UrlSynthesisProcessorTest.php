@@ -7,6 +7,8 @@ use App\Application\Quota\QuotaService;
 use App\Application\Quota\UserUuidResolverInterface;
 use App\Domain\Quota\QuotaCounterInterface;
 use App\Domain\Quota\QuotaServiceUnavailableException;
+use App\Domain\Subscription\Subscription;
+use App\Domain\Subscription\SubscriptionRepositoryInterface;
 use App\Domain\Synthesis\InvalidSynthesisUrlException;
 use App\Domain\Synthesis\SynthesisRequest;
 use App\Domain\Synthesis\SynthesisResponse;
@@ -15,33 +17,38 @@ use App\Domain\Synthesis\SynthesisServiceInterface;
 use App\Domain\Synthesis\SynthesisUnavailableException;
 use App\Presentation\ApiResource\SynthesisResource;
 use App\Presentation\StateProcessor\UrlSynthesisProcessor;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
-use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /*
  * Unit tests — UrlSynthesisProcessor (Presentation layer)
  *
- * Couvre T-010-12 (partie unit) :
+ * Couvre T-013-09 (partie unit) :
  *   - Nominal : POST /api/v1/synthesis avec URL valide → SynthesisResource avec "BRIEFLY AI:"
  *   - URL vide → UnprocessableEntityHttpException (422)
  *   - URL invalide (SSRF) → UnprocessableEntityHttpException (422)
  *   - Mistral KO → ServiceUnavailableHttpException (503) sans stacktrace
- *   - Quota épuisé → TooManyRequestsHttpException (429)
+ *   - Quota épuisé (Free) → HttpException(402) avec X-Resets-At
+ *   - Premium bypass → pas de 402 même quota épuisé côté Redis
+ *   - Mistral KO post-débit (Free) → refund() appelé
  *   - Redis KO → ServiceUnavailableHttpException (503)
  *   - Non authentifié → AccessDeniedException
+ *   - Header X-Date présent → WARNING loggué
  */
 
 // ── Stubs ──────────────────────────────────────────────────────────────────────
 
-function urlQuotaCounterStub(int $count = 0, bool $throwOnGet = false): QuotaCounterInterface
+function urlQuotaCounterStub(int $count = 0, bool $throwOnGet = false, bool &$decrementCalled = false): QuotaCounterInterface
 {
-    return new class($count, $throwOnGet) implements QuotaCounterInterface {
+    return new class($count, $throwOnGet, $decrementCalled) implements QuotaCounterInterface {
         private int $current;
 
-        public function __construct(int $count, private readonly bool $throw)
+        public function __construct(int $count, private readonly bool $throw, private mixed &$decrementCalled)
         {
             $this->current = $count;
         }
@@ -58,6 +65,45 @@ function urlQuotaCounterStub(int $count = 0, bool $throwOnGet = false): QuotaCou
         public function incrementAndExpire(string $userUuid, string $dateUtc, int $expireAt): int
         {
             return ++$this->current;
+        }
+
+        public function decrement(string $userUuid, string $dateUtc): void
+        {
+            $this->decrementCalled = true;
+            $this->current = max(0, $this->current - 1);
+        }
+    };
+}
+
+function urlSubRepoStub(bool $isPremium = false): SubscriptionRepositoryInterface
+{
+    return new class($isPremium) implements SubscriptionRepositoryInterface {
+        public function __construct(private readonly bool $premium)
+        {
+        }
+
+        public function isPremium(string $userUuid): bool
+        {
+            return $this->premium;
+        }
+
+        public function save(Subscription $subscription): void
+        {
+        }
+
+        public function findByStripeEventId(string $eventId): ?Subscription
+        {
+            return null;
+        }
+
+        public function findByStripeSubscriptionId(string $subscriptionId): ?Subscription
+        {
+            return null;
+        }
+
+        public function findByStripeCustomerId(string $customerId): ?Subscription
+        {
+            return null;
         }
     };
 }
@@ -117,12 +163,15 @@ function makeUrlSynthesisProcessor(
     int $quotaCount = 0,
     bool $redisKo = false,
     ?string $userUuid = 'test-user-uuid',
+    bool $isPremium = false,
+    bool &$decrementCalled = false,
+    mixed $logger = null,
 ): UrlSynthesisProcessor {
     return new UrlSynthesisProcessor(
         synthesisService: $synthesisService,
-        quotaService: new QuotaService(urlQuotaCounterStub($quotaCount, $redisKo)),
+        quotaService: new QuotaService(urlQuotaCounterStub($quotaCount, $redisKo, $decrementCalled), urlSubRepoStub($isPremium)),
         userUuidResolver: urlUuidResolverStub($userUuid),
-        logger: new NullLogger(),
+        logger: $logger ?? new NullLogger(),
     );
 }
 
@@ -256,16 +305,16 @@ test('ServiceUnavailableHttpException ne contient pas de stacktrace (OWASP A05)'
 
 // ── Quota ────────────────────────────────────────────────────────────────────
 
-test('process lève TooManyRequestsHttpException si quota épuisé (count=3)', function (): void {
+test('process lève HttpException 402 si quota épuisé (count=3)', function (): void {
     $processor = makeUrlSynthesisProcessor(synthesisServiceStub(), quotaCount: 3);
 
     expect(static fn () => $processor->process(
         inputResourceWithUrl('https://example.com/article'),
         urlSynthesisOperation(),
-    ))->toThrow(TooManyRequestsHttpException::class);
+    ))->toThrow(HttpException::class);
 });
 
-test('TooManyRequestsHttpException a le header X-Quota-Remaining: 0', function (): void {
+test('HttpException 402 a le header X-Resets-At (signature quota_exceeded)', function (): void {
     $processor = makeUrlSynthesisProcessor(synthesisServiceStub(), quotaCount: 3);
 
     try {
@@ -274,7 +323,9 @@ test('TooManyRequestsHttpException a le header X-Quota-Remaining: 0', function (
             urlSynthesisOperation(),
         );
         expect(true)->toBeFalse('Exception attendue non levée');
-    } catch (TooManyRequestsHttpException $e) {
+    } catch (HttpException $e) {
+        expect($e->getStatusCode())->toBe(Response::HTTP_PAYMENT_REQUIRED);
+        expect($e->getHeaders())->toHaveKey('X-Resets-At');
         expect($e->getHeaders())->toHaveKey('X-Quota-Remaining');
         expect($e->getHeaders()['X-Quota-Remaining'])->toBe('0');
     }
@@ -287,6 +338,93 @@ test('process lève ServiceUnavailableHttpException si Redis KO', function (): v
         inputResourceWithUrl('https://example.com/article'),
         urlSynthesisOperation(),
     ))->toThrow(ServiceUnavailableHttpException::class);
+});
+
+// ── Premium bypass (T-013-02) ─────────────────────────────────────────────────
+
+test('process ne lève PAS 402 pour un utilisateur Premium même avec count=3', function (): void {
+    // count=3 = quota épuisé côté free, mais Premium bypass → succès
+    $processor = makeUrlSynthesisProcessor(synthesisServiceStub(), quotaCount: 3, isPremium: true);
+
+    $result = $processor->process(
+        inputResourceWithUrl('https://example.com/article'),
+        urlSynthesisOperation(),
+    );
+
+    expect($result)->toBeInstanceOf(SynthesisResource::class);
+});
+
+// ── Remboursement quota (T-013-06) ────────────────────────────────────────────
+
+test('process appelle refund() si Mistral KO après débit quota Free', function (): void {
+    $decrementCalled = false;
+    $processor = makeUrlSynthesisProcessor(
+        synthesisServiceStub(throwUnavailable: true),
+        quotaCount: 0,
+        decrementCalled: $decrementCalled,
+    );
+
+    try {
+        $processor->process(
+            inputResourceWithUrl('https://example.com/article'),
+            urlSynthesisOperation(),
+        );
+    } catch (ServiceUnavailableHttpException) {
+        // attendu
+    }
+
+    expect($decrementCalled)->toBeTrue();
+});
+
+test('process n\'appelle PAS refund() si Mistral KO pour un utilisateur Premium', function (): void {
+    $decrementCalled = false;
+    $processor = makeUrlSynthesisProcessor(
+        synthesisServiceStub(throwUnavailable: true),
+        quotaCount: 0,
+        isPremium: true,
+        decrementCalled: $decrementCalled,
+    );
+
+    try {
+        $processor->process(
+            inputResourceWithUrl('https://example.com/article'),
+            urlSynthesisOperation(),
+        );
+    } catch (ServiceUnavailableHttpException) {
+        // attendu
+    }
+
+    expect($decrementCalled)->toBeFalse();
+});
+
+// ── Sécurité : header X-Date → WARNING loggué ─────────────────────────────────
+
+test('process log un WARNING si le header X-Date est présent (tentative manipulation)', function (): void {
+    $loggedMessages = [];
+    $spyLogger = new class($loggedMessages) extends AbstractLogger {
+        public function __construct(private array &$messages)
+        {
+        }
+
+        public function log($level, string|Stringable $message, array $context = []): void
+        {
+            $this->messages[] = ['level' => $level, 'message' => $message];
+        }
+    };
+
+    $processor = makeUrlSynthesisProcessor(synthesisServiceStub(), logger: $spyLogger);
+
+    $request = Symfony\Component\HttpFoundation\Request::create('/api/v1/synthesis', 'POST');
+    $request->headers->set('X-Date', '2020-01-01T00:00:00Z');
+
+    $processor->process(
+        inputResourceWithUrl('https://example.com/article'),
+        urlSynthesisOperation(),
+        context: ['request' => $request],
+    );
+
+    $warnings = array_filter($loggedMessages, fn ($m) => 'warning' === $m['level']);
+    expect($warnings)->not->toBeEmpty();
 });
 
 // ── Authentification ──────────────────────────────────────────────────────────

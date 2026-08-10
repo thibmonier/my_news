@@ -15,18 +15,19 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Contrôleur — Quota de synthèses IA (US-033).
+ * Contrôleur — Quota de synthèses IA (US-013).
  *
  * Route : GET /api/v1/quota
  * Auth  : ROLE_USER requis
  *
  * Réponses :
- *   200 {"used": N, "limit": 3, "remaining": R}
+ *   200 {"used": N, "limit": 3, "remaining": R, "isPremium": bool}
+ *       + header X-Quota-Remaining: R (comptes Free uniquement)
  *   503 {"error": "service_unavailable", "message": "..."} si Redis KO
  *   401 si non authentifié (géré par le firewall Symfony)
  *
  * Utilisé par le Turbo Frame `quota-indicator` dans le layout header
- * pour afficher "N / 3 synthèses utilisées" en temps réel.
+ * pour afficher "N / 3 synthèses utilisées" (Free) ou le badge "Premium".
  *
  * RGPD : aucune donnée personnelle dans la réponse ni dans les logs.
  *
@@ -51,6 +52,8 @@ final class QuotaController
             throw new AccessDeniedException('L\'utilisateur n\'est pas authentifié.');
         }
 
+        $isPremium = $this->quotaService->isPremium($userUuid);
+
         try {
             $used = $this->quotaService->getUsed($userUuid);
             $remaining = $this->quotaService->getRemaining($userUuid);
@@ -69,10 +72,18 @@ final class QuotaController
             );
         }
 
-        return new JsonResponse([
+        $response = new JsonResponse([
             'used' => $used,
             'limit' => QuotaService::DAILY_LIMIT,
             'remaining' => $remaining,
+            'isPremium' => $isPremium,
         ]);
+
+        // Header X-Quota-Remaining uniquement pour les comptes Free (US-013 scénario 2)
+        if (!$isPremium) {
+            $response->headers->set('X-Quota-Remaining', (string) $remaining);
+        }
+
+        return $response;
     }
 }

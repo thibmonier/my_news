@@ -1,0 +1,64 @@
+{# Quota indicator — partial inclus dans base.html.twig.
+   US-013 T-013-07 : Turbo Frame quota-indicator.
+   - Compte Free : "X / 3 synthèses restantes" (mis à jour via X-Quota-Remaining header)
+   - Compte Premium : badge "Premium"
+   - Non connecté : rien
+   Le contenu est mis à jour dynamiquement par synthesis_controller.js
+   après chaque synthèse réussie via le header X-Quota-Remaining. #}
+
+{% if app.user is not null and is_granted('ROLE_USER') %}
+<turbo-frame
+    id="quota-indicator"
+    role="status"
+    aria-live="polite"
+>
+    <div
+        class="quota-indicator"
+        data-controller="quota-indicator"
+        data-quota-indicator-url-value="{{ path('api_v1_quota') }}"
+    >
+        {# Contenu initial : placeholder (mis à jour par JS après appel /api/v1/quota) #}
+        <span class="quota-loading" aria-busy="true">…</span>
+    </div>
+</turbo-frame>
+
+<style>
+    .quota-indicator {
+        font-size: .8rem;
+        color: var(--color-on-surface-variant, #6b7280);
+        display: flex;
+        align-items: center;
+        gap: .25rem;
+    }
+    .quota-badge-premium {
+        background: #047857; color: #fff;
+        padding: .15rem .5rem; border-radius: 4px;
+        font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    }
+    .quota-remaining { opacity: .85; }
+</style>
+
+<script>
+(function () {
+    const frame = document.getElementById('quota-indicator');
+    if (!frame) return;
+    const indicator = frame.querySelector('[data-controller="quota-indicator"]');
+    if (!indicator) return;
+    const apiUrl = indicator.dataset.quotaIndicatorUrlValue;
+    if (!apiUrl) return;
+
+    fetch(apiUrl, { headers: { Accept: 'application/json' } })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (!data) return;
+            if (data.isPremium) {
+                indicator.innerHTML = '<span class="quota-badge-premium" aria-label="Compte Premium actif">Premium</span>';
+            } else {
+                const r = data.remaining ?? 0;
+                indicator.innerHTML = `<span class="quota-remaining">${r} / 3 synthèses restantes</span>`;
+            }
+        })
+        .catch(() => { indicator.innerHTML = ''; });
+})();
+</script>
+{% endif %}

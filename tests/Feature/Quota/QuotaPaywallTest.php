@@ -5,13 +5,14 @@ declare(strict_types=1);
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /*
- * Feature tests — US-033 Paywall placeholder
+ * Feature tests — US-013 Paywall (CTA actif → Stripe)
  *
- * Couvre T-033-10 : WebTestCase scénarios du paywall
+ * Couvre T-013-08 : WebTestCase scénarios du paywall
  *   - GET /quota/paywall-modal sans auth → 302/401
  *   - GET /quota/paywall-modal retourne fragment HTML Turbo Frame
- *   - Fragment HTML contient le CTA "Briefly Premium" désactivé
- *   - Le CTA n'est pas un lien fonctionnel (placeholder Sprint 1)
+ *   - Fragment HTML contient le CTA "Briefly Premium" ACTIF (lien Stripe, pas disabled)
+ *   - Fragment HTML ne contient PAS aria-disabled="true" ni href="#" (US-013 remplace US-033)
+ *   - Le CTA pointe vers la route premium_checkout (livré par US-034a)
  *
  * Note : les tests nécessitant un utilisateur authentifié sont conditionnels
  * car l'accès nécessite une session valide (firewall main).
@@ -37,7 +38,7 @@ test('GET /quota/paywall-modal sans authentification retourne 302 ou 401', funct
 
 // ── Structure du fragment HTML (conditionnel si 200) ─────────────────────────
 
-test('GET /quota/paywall-modal retourne du HTML avec le CTA Premium désactivé (si authentifié)', function (): void {
+test('GET /quota/paywall-modal retourne du HTML avec le CTA Premium ACTIF (si authentifié)', function (): void {
     $client = static::createClient();
     $client->request('GET', '/quota/paywall-modal');
 
@@ -52,16 +53,15 @@ test('GET /quota/paywall-modal retourne du HTML avec le CTA Premium désactivé 
         // Message de quota épuisé
         expect($content)->toContain('3 synthèses gratuites');
 
-        // CTA désactivé (aria-disabled et href="#")
-        expect($content)->toContain('aria-disabled="true"')
-            ->and($content)->toContain('href="#"');
-
         // Prix affiché
         expect($content)->toContain('12€/mois');
 
-        // CTA ne renvoie PAS vers Stripe (placeholder Sprint 1)
-        expect($content)->not->toContain('stripe.com')
-            ->and($content)->not->toContain('checkout.stripe');
+        // CTA ACTIF : pas de aria-disabled ni href="#" (US-013 remplace placeholder US-033)
+        expect($content)->not->toContain('aria-disabled="true"');
+        expect($content)->not->toContain('href="#"');
+
+        // CTA pointe vers la route Stripe checkout (US-034a)
+        expect($content)->toContain('premium_checkout');
     } else {
         // Non authentifié ou infrastructure indisponible
         expect($status)->toBeIn([302, 401]);

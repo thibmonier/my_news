@@ -40,4 +40,16 @@ interface QuotaCounterInterface
      * @throws QuotaServiceUnavailableException si le store Redis est inaccessible
      */
     public function incrementAndExpire(string $userUuid, string $dateUtc, int $expireAtTimestamp): int;
+
+    /**
+     * Décrémente le compteur en le plafonnant à 0 (remboursement quota).
+     *
+     * Utilisé par QuotaService::refund() après une erreur serveur IA (US-013).
+     * Garantit que le compteur ne descend jamais sous 0 (script Lua atomique).
+     *
+     * RGPD : clé Redis = UUID uniquement.
+     *
+     * @throws QuotaServiceUnavailableException si le store Redis est inaccessible
+     */
+    public function decrement(string $userUuid, string $dateUtc): void;
 }

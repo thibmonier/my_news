@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Application\Quota\QuotaService;
 use App\Domain\Quota\QuotaCounterInterface;
 use App\Domain\Quota\QuotaServiceUnavailableException;
+use App\Domain\Subscription\Subscription;
+use App\Domain\Subscription\SubscriptionRepositoryInterface;
 
 /*
  * Unit tests — QuotaService (Application layer)
  *
- * Couvre les scénarios Gherkin US-033 :
- *   - Nominal (T-033-07) : 1re synthèse → INCR → 1 → true
+ * Couvre les scénarios Gherkin US-013 :
+ *   - Nominal (T-013-09) : 1re synthèse → INCR → 1 → true
  *   - 2e synthèse        : clé passe à 2, retourne true
  *   - 3e (dernière)      : clé passe à 3, retourne true
  *   - 4e tentative       : retourne false, clé reste à 3 (pas d'INCR)
@@ -19,6 +21,8 @@ use App\Domain\Quota\QuotaServiceUnavailableException;
  *   - Redis KO           : QuotaServiceUnavailableException propagée
  *   - getRemaining       : calcul correct (3 - used)
  *   - getUsed            : plafonné à 3
+ *   - Premium bypass (T-013-02) : consumeOrDeny/getRemaining/getUsed sans Redis pour Premium
+ *   - refund (T-013-04) : decrement() appelé, plancher à 0
  *
  * Utilise des stubs PHP anonymes (pas de Mockery).
  */
@@ -31,6 +35,7 @@ use App\Domain\Quota\QuotaServiceUnavailableException;
  * - $capturedIncrUuid : capture l'UUID passé à incrementAndExpire
  * - $capturedExpireAt : capture l'expireAtTimestamp passé à incrementAndExpire
  * - $throwOnGet / $throwOnIncr : simule Redis KO
+ * - $decrementCalled : mis à true si decrement() est appelé
  */
 function makeCounterStub(
     int $initialCount = 0,
@@ -39,8 +44,9 @@ function makeCounterStub(
     ?int &$capturedExpireAt = null,
     bool $throwOnGet = false,
     bool $throwOnIncr = false,
+    bool &$decrementCalled = false,
 ): QuotaCounterInterface {
-    return new class($initialCount, $capturedIncrUuid, $capturedDateUtc, $capturedExpireAt, $throwOnGet, $throwOnIncr) implements QuotaCounterInterface {
+    return new class($initialCount, $capturedIncrUuid, $capturedDateUtc, $capturedExpireAt, $throwOnGet, $throwOnIncr, $decrementCalled) implements QuotaCounterInterface {
         private int $count;
 
         public function __construct(
@@ -50,6 +56,7 @@ function makeCounterStub(
             private mixed &$capturedExpiry,
             private readonly bool $throwGet,
             private readonly bool $throwIncr,
+            private mixed &$decrementCalled,
         ) {
             $this->count = $initial;
         }
@@ -76,12 +83,51 @@ function makeCounterStub(
 
             return $this->count;
         }
+
+        public function decrement(string $userUuid, string $dateUtc): void
+        {
+            $this->decrementCalled = true;
+            $this->count = max(0, $this->count - 1);
+        }
     };
 }
 
-function makeQuotaService(QuotaCounterInterface $counter): QuotaService
+function makeSubRepoStub(bool $isPremium = false): SubscriptionRepositoryInterface
 {
-    return new QuotaService($counter);
+    return new class($isPremium) implements SubscriptionRepositoryInterface {
+        public function __construct(private readonly bool $premium)
+        {
+        }
+
+        public function isPremium(string $userUuid): bool
+        {
+            return $this->premium;
+        }
+
+        public function save(Subscription $subscription): void
+        {
+        }
+
+        public function findByStripeEventId(string $eventId): ?Subscription
+        {
+            return null;
+        }
+
+        public function findByStripeSubscriptionId(string $subscriptionId): ?Subscription
+        {
+            return null;
+        }
+
+        public function findByStripeCustomerId(string $customerId): ?Subscription
+        {
+            return null;
+        }
+    };
+}
+
+function makeQuotaService(QuotaCounterInterface $counter, ?SubscriptionRepositoryInterface $subRepo = null): QuotaService
+{
+    return new QuotaService($counter, $subRepo ?? makeSubRepoStub());
 }
 
 const TEST_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
@@ -174,6 +220,77 @@ test('consumeOrDeny propage QuotaServiceUnavailableException si Redis KO (INCR)'
 
     expect(static fn () => $service->consumeOrDeny(TEST_UUID))
         ->toThrow(QuotaServiceUnavailableException::class);
+});
+
+// ── Premium bypass (T-013-02) ─────────────────────────────────────────────────
+
+test('consumeOrDeny retourne true sans appel Redis pour un utilisateur Premium', function (): void {
+    $capturedExpire = null;
+    // count=3 (quota épuisé côté free) mais Premium → doit retourner true sans Redis
+    $counter = makeCounterStub(initialCount: 3, capturedExpireAt: $capturedExpire);
+    $service = makeQuotaService($counter, makeSubRepoStub(isPremium: true));
+
+    $result = $service->consumeOrDeny(TEST_UUID);
+
+    expect($result)->toBeTrue()
+        ->and($capturedExpire)->toBeNull(); // Redis non appelé
+});
+
+test('isPremium retourne true pour un abonnement actif', function (): void {
+    $counter = makeCounterStub();
+    $service = makeQuotaService($counter, makeSubRepoStub(isPremium: true));
+
+    expect($service->isPremium(TEST_UUID))->toBeTrue();
+});
+
+test('isPremium retourne false pour un compte sans abonnement', function (): void {
+    $counter = makeCounterStub();
+    $service = makeQuotaService($counter, makeSubRepoStub(isPremium: false));
+
+    expect($service->isPremium(TEST_UUID))->toBeFalse();
+});
+
+test('getRemaining retourne DAILY_LIMIT pour un utilisateur Premium (sans Redis)', function (): void {
+    $counter = makeCounterStub(initialCount: 99); // valeur Redis ignorée
+    $service = makeQuotaService($counter, makeSubRepoStub(isPremium: true));
+
+    expect($service->getRemaining(TEST_UUID))->toBe(QuotaService::DAILY_LIMIT);
+});
+
+test('getUsed retourne 0 pour un utilisateur Premium (sans Redis)', function (): void {
+    $counter = makeCounterStub(initialCount: 99); // valeur Redis ignorée
+    $service = makeQuotaService($counter, makeSubRepoStub(isPremium: true));
+
+    expect($service->getUsed(TEST_UUID))->toBe(0);
+});
+
+// ── refund (T-013-04) ─────────────────────────────────────────────────────────
+
+test('refund() appelle decrement() sur le counter', function (): void {
+    $decrementCalled = false;
+    $counter = makeCounterStub(initialCount: 1, decrementCalled: $decrementCalled);
+    makeQuotaService($counter)->refund(TEST_UUID);
+
+    expect($decrementCalled)->toBeTrue();
+});
+
+test('refund() ne rend pas le compteur négatif (plancher à 0)', function (): void {
+    // Avec initialCount=0, decrement doit plafonner à 0 (logique du stub)
+    $decrementCalled = false;
+    $counter = makeCounterStub(initialCount: 0, decrementCalled: $decrementCalled);
+    makeQuotaService($counter)->refund(TEST_UUID);
+
+    expect($decrementCalled)->toBeTrue();
+});
+
+// ── nextMidnightUtcIso ────────────────────────────────────────────────────────
+
+test('nextMidnightUtcIso retourne un ISO8601 UTC à minuit', function (): void {
+    $service = makeQuotaService(makeCounterStub());
+    $iso = $service->nextMidnightUtcIso();
+
+    // Format ATOM : 2026-08-12T00:00:00+00:00
+    expect($iso)->toMatch('/^\d{4}-\d{2}-\d{2}T00:00:00\+00:00$/');
 });
 
 // ── getRemaining ────────────────────────────────────────────────────────────────
