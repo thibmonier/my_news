@@ -15,6 +15,7 @@ use App\Domain\Subscription\StripeGatewayInterface;
 final class StripeGatewayStub implements StripeGatewayInterface
 {
     public const TEST_CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/test_stub_session';
+    public const TEST_PORTAL_URL = 'https://billing.stripe.com/p/session/test_stub_portal';
 
     public function createCheckoutSession(
         string $plan,
@@ -23,5 +24,10 @@ final class StripeGatewayStub implements StripeGatewayInterface
         string $cancelUrl,
     ): string {
         return self::TEST_CHECKOUT_URL . '_' . $plan;
+    }
+
+    public function createPortalSession(string $customerId, string $returnUrl): string
+    {
+        return self::TEST_PORTAL_URL . '_' . $customerId;
     }
 }

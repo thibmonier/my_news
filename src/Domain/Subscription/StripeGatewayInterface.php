@@ -26,4 +26,12 @@ interface StripeGatewayInterface
         string $successUrl,
         string $cancelUrl,
     ): string;
+
+    /**
+     * Crée une session Stripe Customer Portal et retourne l'URL de redirection.
+     *
+     * @param string $customerId stripe_customer_id depuis la table subscriptions
+     * @param string $returnUrl URL de retour après fermeture du portail (ex: /profile/edit)
+     */
+    public function createPortalSession(string $customerId, string $returnUrl): string;
 }

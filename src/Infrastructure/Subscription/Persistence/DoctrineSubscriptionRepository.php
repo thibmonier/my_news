@@ -15,7 +15,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * isPremium() utilise l'index composé (status, current_period_end) pour les performances.
  * save() délègue à DBAL pour le INSERT ... ON CONFLICT DO NOTHING (idempotence webhook).
  */
-final class DoctrineSubscriptionRepository implements SubscriptionRepositoryInterface
+class DoctrineSubscriptionRepository implements SubscriptionRepositoryInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -52,7 +52,8 @@ final class DoctrineSubscriptionRepository implements SubscriptionRepositoryInte
     }
 
     /**
-     * Vérifie si l'utilisateur a un abonnement actif.
+     * Vérifie si l'utilisateur a un accès Premium.
+     * Grace period : status = 'past_due' conserve l'accès tant que current_period_end > NOW().
      * Utilise l'index composé (status, current_period_end) pour les performances.
      */
     public function isPremium(string $userUuid): bool
@@ -60,7 +61,7 @@ final class DoctrineSubscriptionRepository implements SubscriptionRepositoryInte
         $result = $this->connection->fetchOne(
             "SELECT 1 FROM subscriptions
              WHERE user_id = :userId
-               AND status = 'active'
+               AND status IN ('active', 'past_due')
                AND current_period_end > NOW()
              LIMIT 1",
             ['userId' => $userUuid],
@@ -94,5 +95,49 @@ final class DoctrineSubscriptionRepository implements SubscriptionRepositoryInte
             ->findOneBy(['stripeCustomerId' => $customerId]);
 
         return $entity?->toDomain();
+    }
+
+    public function findByUserId(string $userUuid): ?Subscription
+    {
+        $entity = $this->entityManager
+            ->getRepository(DoctrineSubscriptionEntity::class)
+            ->findOneBy(['userId' => $userUuid]);
+
+        return $entity?->toDomain();
+    }
+
+    /**
+     * Met à jour un abonnement par stripe_subscription_id.
+     * Retourne false si aucun enregistrement correspondant n'est trouvé.
+     *
+     * Champs autorisés : status, plan, current_period_end, cancel_at_period_end.
+     * Appelé depuis les handlers Infrastructure (pas exposé dans le port Domain).
+     *
+     * @param array<string, mixed> $fields
+     */
+    public function updateByStripeSubscriptionId(string $stripeSubscriptionId, array $fields): bool
+    {
+        $allowed = ['status', 'plan', 'current_period_end', 'cancel_at_period_end'];
+        $setClauses = [];
+        $params = ['stripeSubscriptionId' => $stripeSubscriptionId];
+
+        foreach ($fields as $field => $value) {
+            if (!\in_array($field, $allowed, true)) {
+                continue;
+            }
+            $setClauses[] = "{$field} = :{$field}";
+            $params[$field] = $value;
+        }
+
+        if ([] === $setClauses) {
+            return false;
+        }
+
+        $affected = $this->connection->executeStatement(
+            'UPDATE subscriptions SET ' . implode(', ', $setClauses) . ' WHERE stripe_subscription_id = :stripeSubscriptionId',
+            $params,
+        );
+
+        return $affected > 0;
     }
 }

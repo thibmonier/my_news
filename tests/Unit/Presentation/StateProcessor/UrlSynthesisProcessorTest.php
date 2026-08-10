@@ -105,6 +105,11 @@ function urlSubRepoStub(bool $isPremium = false): SubscriptionRepositoryInterfac
         {
             return null;
         }
+
+        public function findByUserId(string $userUuid): ?Subscription
+        {
+            return null;
+        }
     };
 }
 

@@ -42,6 +42,9 @@ class DoctrineSubscriptionEntity
     #[ORM\Column(name: 'stripe_event_id', length: 255, unique: true)]
     private string $stripeEventId;
 
+    #[ORM\Column(name: 'cancel_at_period_end', type: 'boolean', options: ['default' => false])]
+    private bool $cancelAtPeriodEnd = false;
+
     #[ORM\Column(name: 'created_at', type: 'datetimetz_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -60,6 +63,7 @@ class DoctrineSubscriptionEntity
         \DateTimeImmutable $currentPeriodEnd,
         string $stripeEventId,
         \DateTimeImmutable $createdAt,
+        bool $cancelAtPeriodEnd = false,
     ) {
         $this->id = $id;
         $this->userId = $userId;
@@ -70,6 +74,7 @@ class DoctrineSubscriptionEntity
         $this->currentPeriodEnd = $currentPeriodEnd;
         $this->stripeEventId = $stripeEventId;
         $this->createdAt = $createdAt;
+        $this->cancelAtPeriodEnd = $cancelAtPeriodEnd;
     }
 
     public static function fromDomain(Subscription $subscription): self
@@ -84,6 +89,7 @@ class DoctrineSubscriptionEntity
             currentPeriodEnd: $subscription->getCurrentPeriodEnd(),
             stripeEventId: $subscription->getStripeEventId(),
             createdAt: new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            cancelAtPeriodEnd: $subscription->getCancelAtPeriodEnd(),
         );
     }
 
@@ -98,7 +104,13 @@ class DoctrineSubscriptionEntity
             status: $this->status,
             currentPeriodEnd: $this->currentPeriodEnd,
             stripeEventId: $this->stripeEventId,
+            cancelAtPeriodEnd: $this->cancelAtPeriodEnd,
         );
+    }
+
+    public function getCancelAtPeriodEnd(): bool
+    {
+        return $this->cancelAtPeriodEnd;
     }
 
     public function getId(): string

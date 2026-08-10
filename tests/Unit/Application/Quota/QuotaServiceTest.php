@@ -122,6 +122,11 @@ function makeSubRepoStub(bool $isPremium = false): SubscriptionRepositoryInterfa
         {
             return null;
         }
+
+        public function findByUserId(string $userUuid): ?Subscription
+        {
+            return null;
+        }
     };
 }
 

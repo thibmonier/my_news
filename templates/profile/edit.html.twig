@@ -35,6 +35,15 @@
         .btn-submit:hover { background: #1a2f4f; }
         .separator { border: none; border-top: 1px solid #e5e7eb; margin: 1.75rem 0; }
         .email-note { background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 0.625rem 0.875rem; font-size: 0.8rem; color: #854d0e; margin-bottom: 1.25rem; }
+        /* Subscription card */
+        .subscription-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 1.5rem 2rem; margin-bottom: 1.5rem; }
+        .subscription-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .badge { display: inline-block; padding: 0.25rem 0.625rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .badge-active { background: #d1fae5; color: #065f46; }
+        .badge-cancel { background: #fef9c3; color: #854d0e; }
+        .badge-past-due { background: #fee2e2; color: #7f1d1d; }
+        .btn-manage { display: inline-flex; align-items: center; gap: .375rem; padding: 0.5rem 1.25rem; background: #091426; color: #fff; border-radius: 6px; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: background .15s; }
+        .btn-manage:hover { background: #1a2f4f; }
         {% if user.emailPending is not null %}
         .email-pending { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 0.625rem 0.875rem; font-size: 0.8rem; color: #1e40af; margin-bottom: 1.25rem; }
         {% endif %}
@@ -76,6 +85,30 @@
         {% if user.emailPending is not null %}
             <div class="email-pending" role="status">
                 ⏳ Confirmation en attente pour <strong>{{ user.emailPending }}</strong>. Vérifiez votre boîte mail.
+            </div>
+        {% endif %}
+
+        {# Section abonnement — visible uniquement pour les utilisateurs Premium #}
+        {% if subscription is not null and subscription.isPremium() %}
+            <div class="subscription-card" aria-label="Mon abonnement">
+                <h2>Mon abonnement</h2>
+
+                {% if subscription.status.value == 'past_due' %}
+                    <span class="badge badge-past-due">Paiement en échec</span>
+                    <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.75rem;">
+                        Accès maintenu jusqu'au {{ subscription.currentPeriodEnd|date('d/m/Y') }}. Mettez à jour votre moyen de paiement.
+                    </p>
+                {% elseif subscription.cancelAtPeriodEnd %}
+                    <span class="badge badge-cancel">Annulé — accès maintenu jusqu'au {{ subscription.currentPeriodEnd|date('d/m/Y') }}</span>
+                {% else %}
+                    <span class="badge badge-active">Actif</span>
+                {% endif %}
+
+                <div>
+                    <a href="{{ path('app_profile_manage_subscription') }}" class="btn-manage">
+                        Gérer mon abonnement
+                    </a>
+                </div>
             </div>
         {% endif %}
 

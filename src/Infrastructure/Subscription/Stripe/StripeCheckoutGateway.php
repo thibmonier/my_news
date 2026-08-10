@@ -47,4 +47,23 @@ final class StripeCheckoutGateway implements StripeGatewayInterface
 
         return (string) $session->url;
     }
+
+    /**
+     * Crée une session Stripe Customer Portal.
+     * La session expire après 5 minutes (comportement Stripe natif).
+     */
+    public function createPortalSession(string $customerId, string $returnUrl): string
+    {
+        \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+
+        $session = \Stripe\BillingPortal\Session::create([
+            'customer' => $customerId,
+            'return_url' => $returnUrl,
+        ]);
+
+        /** @var string $url */
+        $url = $session->url;
+
+        return $url;
+    }
 }

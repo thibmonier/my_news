@@ -42,6 +42,11 @@ test('checkout.session.completed valide → save() appelé une fois avec status 
         {
             return null;
         }
+
+        public function findByUserId(string $userUuid): ?Subscription
+        {
+            return null;
+        }
     };
 
     $handler = new SubscriptionActivatedHandler($repository, new NullLogger());
@@ -96,6 +101,11 @@ test('plan yearly extrait correctement depuis metadata', function (): void {
         {
             return null;
         }
+
+        public function findByUserId(string $userUuid): ?Subscription
+        {
+            return null;
+        }
     };
 
     $handler = new SubscriptionActivatedHandler($repository, new NullLogger());
@@ -143,6 +153,11 @@ test('autre type d\'événement (invoice.paid) → handler retourne sans appel s
         {
             return null;
         }
+
+        public function findByUserId(string $userUuid): ?Subscription
+        {
+            return null;
+        }
     };
 
     $handler = new SubscriptionActivatedHandler($repository, new NullLogger());
@@ -181,6 +196,11 @@ test('subscription.updated ignoré → 0 appels save()', function (): void {
         }
 
         public function findByStripeCustomerId(string $customerId): ?Subscription
+        {
+            return null;
+        }
+
+        public function findByUserId(string $userUuid): ?Subscription
         {
             return null;
         }

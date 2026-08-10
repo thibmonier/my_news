@@ -29,4 +29,10 @@ interface SubscriptionRepositoryInterface
     public function findByStripeSubscriptionId(string $subscriptionId): ?Subscription;
 
     public function findByStripeCustomerId(string $customerId): ?Subscription;
+
+    /**
+     * Retourne l'abonnement actif d'un utilisateur (quel que soit le statut).
+     * Retourne null si aucun abonnement n'existe en base.
+     */
+    public function findByUserId(string $userUuid): ?Subscription;
 }

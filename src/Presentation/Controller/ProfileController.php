@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Presentation\Controller;
 
+use App\Application\Subscription\SubscriptionService;
 use App\Application\User\Profile\EmailAlreadyInUseException;
 use App\Application\User\Profile\EmailChangeService;
 use App\Application\User\Profile\UpdateProfileService;
+use App\Domain\Subscription\SubscriptionNotFoundException;
 use App\Domain\User\UserProfileInterface;
 use App\Presentation\Form\ProfileFormData;
 use App\Presentation\Form\ProfileFormType;
 use App\Presentation\Security\ProfileVoter;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -48,6 +51,8 @@ final class ProfileController extends AbstractController
     public function __construct(
         private readonly UpdateProfileService $updateProfileService,
         private readonly EmailChangeService $emailChangeService,
+        private readonly SubscriptionService $subscriptionService,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -100,6 +105,7 @@ final class ProfileController extends AbstractController
                     return $this->render('profile/edit.html.twig', [
                         'form' => $form,
                         'user' => $user,
+                        'subscription' => $this->subscriptionService->findSubscriptionForUser($user->getUserUuid()),
                     ], new Response('', Response::HTTP_UNPROCESSABLE_ENTITY));
                 }
 
@@ -129,10 +135,46 @@ final class ProfileController extends AbstractController
             ? Response::HTTP_UNPROCESSABLE_ENTITY
             : Response::HTTP_OK;
 
+        $subscription = $this->subscriptionService->findSubscriptionForUser($user->getUserUuid());
+
         return $this->render('profile/edit.html.twig', [
             'form' => $form,
             'user' => $user,
+            'subscription' => $subscription,
         ], new Response('', $statusCode));
+    }
+
+    /**
+     * GET /profile/manage-subscription — Génère une session Stripe Customer Portal et redirige.
+     *
+     * Sécurité : ROLE_USER requis. L'utilisateur ouvre uniquement son propre portail
+     *   (stripe_customer_id récupéré depuis la DB via son user_uuid — pas d'IDOR possible).
+     * Si aucun abonnement actif → flash error + redirect /premium.
+     * Log INFO : user_uuid uniquement (jamais l'URL Stripe).
+     */
+    #[Route('/profile/manage-subscription', name: 'app_profile_manage_subscription', methods: ['GET'])]
+    public function manageSubscription(): Response
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof UserProfileInterface) {
+            throw $this->createAccessDeniedException('Profil inaccessible.');
+        }
+
+        try {
+            $portalUrl = $this->subscriptionService->createPortalSession($user->getUserUuid());
+        } catch (SubscriptionNotFoundException) {
+            $this->addFlash('error', 'Aucun abonnement actif trouvé.');
+
+            return $this->redirectToRoute('premium_index');
+        }
+
+        $this->logger->info('Customer portal session created', [
+            'user_uuid' => $user->getUserUuid(),
+            'action' => 'portal_session_created',
+        ]);
+
+        return $this->redirect($portalUrl);
     }
 
     /**

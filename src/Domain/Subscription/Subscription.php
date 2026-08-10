@@ -22,6 +22,7 @@ final class Subscription
         private readonly SubscriptionStatus $status,
         private readonly \DateTimeImmutable $currentPeriodEnd,
         private readonly string $stripeEventId,
+        private readonly bool $cancelAtPeriodEnd = false,
     ) {
     }
 
@@ -65,9 +66,26 @@ final class Subscription
         return $this->stripeEventId;
     }
 
+    public function getCancelAtPeriodEnd(): bool
+    {
+        return $this->cancelAtPeriodEnd;
+    }
+
     public function isActive(): bool
     {
         return SubscriptionStatus::ACTIVE === $this->status
             && $this->currentPeriodEnd > new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+    }
+
+    /**
+     * isPremium = active OR (past_due AND current_period_end > now).
+     * Grace period past_due : l'accès Premium est maintenu jusqu'à current_period_end.
+     */
+    public function isPremium(): bool
+    {
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+
+        return \in_array($this->status, [SubscriptionStatus::ACTIVE, SubscriptionStatus::PAST_DUE], true)
+            && $this->currentPeriodEnd > $now;
     }
 }

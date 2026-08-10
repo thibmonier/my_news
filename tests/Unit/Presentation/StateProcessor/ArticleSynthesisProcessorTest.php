@@ -106,6 +106,11 @@ function articleSubRepoStub(bool $isPremium = false): SubscriptionRepositoryInte
         {
             return null;
         }
+
+        public function findByUserId(string $userUuid): ?Subscription
+        {
+            return null;
+        }
     };
 }
 
