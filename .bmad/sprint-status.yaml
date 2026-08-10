@@ -21,7 +21,7 @@ sprints:
     name: sprint-004-monetisation
     slug: monetisation
     goal: "Transformer le placeholder quota en Premium réel : Stripe Checkout, quota gratuit HTTP 402, portail client et réglages RGPD."
-    status: ready
+    status: review
     dates: "2026-09-08 → 2026-09-21"
     points: 16
     tasks: 60
