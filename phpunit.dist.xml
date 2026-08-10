@@ -38,6 +38,12 @@
     <server name="LOCK_DSN" value="redis://127.0.0.1:6379"/>
     <!-- Requis par messenger.yaml default:hostname:HOSTNAME pour le consumer name -->
     <env name="HOSTNAME" value="test-worker"/>
+    <!-- Stripe — US-034a : clés de test (sans valeur réelle) pour WebTestCase -->
+    <server name="STRIPE_SECRET_KEY" value="sk_test_fake_key_for_tests"/>
+    <server name="STRIPE_PUBLISHABLE_KEY" value="pk_test_fake_key_for_tests"/>
+    <server name="STRIPE_WEBHOOK_SECRET" value="whsec_test_webhook_secret_for_tests_32chars"/>
+    <server name="STRIPE_PRICE_MONTHLY" value="price_test_monthly"/>
+    <server name="STRIPE_PRICE_YEARLY" value="price_test_yearly"/>
   </php>
   <source>
     <include>

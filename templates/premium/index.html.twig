@@ -1,0 +1,81 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Briefly Premium — Synthèses illimitées{% endblock %}
+
+{% block header %}
+<header class="site-header">
+    <a href="/" class="logo-link" aria-label="Briefly AI — accueil">BRIEFLY AI</a>
+    <nav class="app-nav" aria-label="Navigation principale">
+        <a href="/dashboard">Tableau de bord</a>
+        <a href="/brief">Mon brief</a>
+        <a href="/logout">Se déconnecter</a>
+    </nav>
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Basculer le thème clair/sombre">
+        <span aria-hidden="true">◐</span> Thème
+    </button>
+</header>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+
+    {% for message in app.flashes('error') %}
+        <div class="flash flash--error" role="alert">{{ message }}</div>
+    {% endfor %}
+
+    {% if app.request.query.get('checkout') == 'cancelled' %}
+        <div class="flash flash--error" role="alert">
+            Le paiement n'a pas pu être traité. Vérifiez vos informations de carte.
+        </div>
+    {% endif %}
+
+    {% if is_granted('ROLE_USER') and app.user is not null %}
+        {# Affichage "déjà abonné" géré côté controller si nécessaire — placeholder T-034b #}
+    {% endif %}
+
+    <section class="premium-hero" aria-labelledby="premium-title">
+        <h1 id="premium-title">Briefly Premium</h1>
+        <p class="premium-tagline">Des synthèses IA illimitées, tous les jours, sans interruption.</p>
+    </section>
+
+    <section class="premium-features" aria-labelledby="features-title">
+        <h2 id="features-title">Ce que vous obtenez</h2>
+        <ul class="features-list">
+            <li>Synthèses illimitées — tous les articles, toutes les sources</li>
+            <li>Tous les niveaux de détail (bref, standard, approfondi)</li>
+            <li>Accès au Daily Brief complet sans coupure</li>
+            <li>Priorité de traitement sur l'IA Mistral</li>
+        </ul>
+    </section>
+
+    <section class="pricing" aria-labelledby="pricing-title">
+        <h2 id="pricing-title">Choisissez votre offre</h2>
+
+        <div class="pricing-cards">
+            <article class="pricing-card" aria-label="Offre mensuelle">
+                <h3>Mensuel</h3>
+                <p class="pricing-amount"><strong>12 €</strong><span class="pricing-period">/mois</span></p>
+                <p class="pricing-description">Sans engagement, résiliable à tout moment.</p>
+                <a href="{{ path('premium_checkout', {plan: 'monthly'}) }}"
+                   class="btn btn--primary"
+                   aria-label="Choisir l'offre mensuelle — 12€/mois">
+                    Choisir l'offre mensuelle
+                </a>
+            </article>
+
+            <article class="pricing-card pricing-card--featured" aria-label="Offre annuelle — meilleur rapport qualité-prix">
+                <span class="pricing-badge" aria-label="Économisez 45€ par an, soit 17% de réduction">Économisez 17% — 45€/an</span>
+                <h3>Annuel</h3>
+                <p class="pricing-amount"><strong>99 €</strong><span class="pricing-period">/an</span></p>
+                <p class="pricing-description">Soit 8,25 €/mois. Le meilleur rapport qualité-prix.</p>
+                <a href="{{ path('premium_checkout', {plan: 'yearly'}) }}"
+                   class="btn btn--primary"
+                   aria-label="Choisir l'offre annuelle — 99€/an">
+                    Choisir l'offre annuelle
+                </a>
+            </article>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

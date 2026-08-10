@@ -203,6 +203,27 @@ services:
             $mistralClient: '@App\Infrastructure\Summary\Ai\MistralSummaryClient'
             $openAiClient: '@App\Infrastructure\Summary\Ai\OpenAiSummaryClient'
 
+    # ── Stripe Billing — US-034a ─────────────────────────────────────────────────
+    # StripeGatewayInterface → StripeCheckoutGateway (adapter Stripe SDK)
+    App\Domain\Subscription\StripeGatewayInterface:
+        alias: App\Infrastructure\Subscription\Stripe\StripeCheckoutGateway
+
+    # SubscriptionRepositoryInterface → DoctrineSubscriptionRepository
+    App\Domain\Subscription\SubscriptionRepositoryInterface:
+        alias: App\Infrastructure\Subscription\Persistence\DoctrineSubscriptionRepository
+
+    # StripeCheckoutGateway : injection des clés Stripe (env — jamais en dur)
+    App\Infrastructure\Subscription\Stripe\StripeCheckoutGateway:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePriceMonthly: '%env(STRIPE_PRICE_MONTHLY)%'
+            $stripePriceYearly: '%env(STRIPE_PRICE_YEARLY)%'
+
+    # StripeWebhookController : injection du webhook secret
+    App\Presentation\Controller\Stripe\StripeWebhookController:
+        arguments:
+            $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+
     # ── US-006 : Featured Summary desktop ───────────────────────────────────────
 
     # Application service port → implementation

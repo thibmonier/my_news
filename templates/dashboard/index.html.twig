@@ -22,6 +22,12 @@
         <div class="flash flash--success" role="status">{{ message }}</div>
     {% endfor %}
 
+    {% if app.request.query.get('checkout') == 'success' %}
+        <div class="flash flash--success flash--premium" role="status" aria-live="polite">
+            Bienvenue dans Briefly Premium ! Vos synthèses illimitées sont maintenant actives.
+        </div>
+    {% endif %}
+
     <h1>Tableau de bord</h1>
     <p>Bienvenue sur <strong>Briefly AI</strong> — votre agrégateur de news intelligent.</p>
     <p>Votre Daily Brief quotidien vous attend :</p>
