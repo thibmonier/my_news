@@ -86,6 +86,7 @@ security:
         - { path: ^/api/v1/articles, roles: ROLE_USER }     # US-010/US-033 : synthesize par article ID
         - { path: ^/quota/paywall-modal, roles: ROLE_USER }  # US-033 : paywall modal authentifié
         - { path: ^/premium, roles: ROLE_USER }              # US-034a : page Premium + checkout authentifié
+        - { path: ^/settings, roles: ROLE_USER }             # US-035 : réglages de confidentialité RGPD
         - { path: ^/api/v1, roles: PUBLIC_ACCESS }           # API Platform — voters sur chaque opération
 
 when@dev:

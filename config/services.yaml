@@ -224,6 +224,10 @@ services:
         arguments:
             $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
 
+    # ── US-035 : Réglages de confidentialité RGPD ───────────────────────────────
+    App\Domain\Privacy\PrivacySettingsRepositoryInterface:
+        alias: App\Infrastructure\User\Privacy\DoctrinePrivacySettingsRepository
+
     # ── US-006 : Featured Summary desktop ───────────────────────────────────────
 
     # Application service port → implementation
